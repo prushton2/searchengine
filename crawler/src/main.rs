@@ -7,8 +7,6 @@ use curl::easy::{Easy};
 use tokio;
 
 mod crawl_page;
-// mod blocking;
-
 
 #[tokio::main]
 async fn main() {
@@ -16,6 +14,7 @@ async fn main() {
     let mut usedurls: HashMap<String, u64> = [].into();
     
     loop {
+        //one page a second (good? idk)
         sleep(Duration::new(1, 0));
         let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH);
         
@@ -24,14 +23,15 @@ async fn main() {
             None => {println!("Crawler ran out of urls"); break}
         };
         
+        // dont redo a url within a week
         if usedurls.contains_key(&url) && *usedurls.get(&url).expect("") < now.clone().expect("").as_secs(){
             continue;
         }
         
+        //crawl it and store the crawled urls
         let crawled_urls = crawl_and_save(url.as_str());
         urlqueue.extend(crawled_urls);
         
-
         usedurls.insert(
             url.clone(),
             now.expect("what").as_secs() + 86400 * 7
@@ -45,10 +45,9 @@ async fn main() {
 fn crawl_and_save(url: &str) -> Vec<String>{
 
     let mut destinations = vec![];
-        
-    //body
     let mut out_vec = Vec::new();
 
+    // curl is scoped to ensure the borrow of out_vec is released before other use
     {
         let mut curl = Easy::new();
         curl.url(url).unwrap();

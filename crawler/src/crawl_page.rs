@@ -2,7 +2,7 @@ use std::str;
 use curl::easy::WriteError;
 use scraper::{Html, Selector};
 use std::collections::HashMap;
-
+use serde::{Serialize, Deserialize};
 
 #[derive(Clone)]
 struct PageContent {
@@ -26,8 +26,6 @@ pub fn process_out(bytes: &[u8], url: &str, crawled_urls: &mut Vec<String>) -> R
 
     let root_url: String = [root_url_iter.next().unwrap(), "//", root_url_iter.next().unwrap(), root_url_iter.next().unwrap()].concat();
 
-    println!("{:?}", root_url);
-
     for (index, link) in page_content.links.clone().into_iter().enumerate() {
         if link.chars().nth(0) == Some('/') {
             let string = [root_url.as_str(), link.as_str()].concat();
@@ -38,8 +36,6 @@ pub fn process_out(bytes: &[u8], url: &str, crawled_urls: &mut Vec<String>) -> R
     crawled_urls.extend(page_content.links.clone());
 
     let crawled_page = crawl_page(&page_content, url);
-
-    // println!("{:?}", crawled_page);
     
     return Ok(bytes.len());
 }
