@@ -10,10 +10,12 @@ async fn main() {
 
     let url = "https://example.com/";
 
-    let _ = crawl_and_save(url);
+    let destinations = crawl_and_save(url);
+
+    println!("{:?}", destinations)
 }
 
-fn crawl_and_save(url: &str) -> Vec<&str>{
+fn crawl_and_save(url: &str) -> Vec<String>{
 
     let mut destinations = vec![];
         

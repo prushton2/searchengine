@@ -17,11 +17,13 @@ struct CrawledPage {
     words: HashMap<String, u32>
 }
 
-pub fn process_out(bytes: &[u8], url: &str, crawled_urls: &mut Vec<&str>) -> Result<usize, WriteError> {
+pub fn process_out(bytes: &[u8], url: &str, crawled_urls: &mut Vec<String>) -> Result<usize, WriteError> {
     
     let page_content = strip_html(bytes).unwrap();
 
-    let crawled_page = crawl_page(page_content, url);
+    crawled_urls.extend(page_content.links.clone());
+
+    let crawled_page = crawl_page(&page_content, url);
 
     println!("{:?}", crawled_page);
     
@@ -63,7 +65,7 @@ fn strip_html(bytes: &[u8]) -> Result<PageContent, &str> {
     Ok(page_content)
 }
 
-fn crawl_page(page: PageContent, url: &str) -> Result<CrawledPage, &str> {
+fn crawl_page(page: &PageContent, url: &str) -> Result<CrawledPage, String> {
     let mut crawled_page = CrawledPage{
         version: 1,
         url: String::from(url),
