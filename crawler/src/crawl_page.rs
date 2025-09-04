@@ -19,13 +19,27 @@ struct CrawledPage {
 
 pub fn process_out(bytes: &[u8], url: &str, crawled_urls: &mut Vec<String>) -> Result<usize, WriteError> {
     
-    let page_content = strip_html(bytes).unwrap();
+    let mut page_content = strip_html(bytes).unwrap();
+
+    // resolve relative urls
+    let mut root_url_iter = url.split("/");
+
+    let root_url: String = [root_url_iter.next().unwrap(), "//", root_url_iter.next().unwrap(), root_url_iter.next().unwrap()].concat();
+
+    println!("{:?}", root_url);
+
+    for (index, link) in page_content.links.clone().into_iter().enumerate() {
+        if link.chars().nth(0) == Some('/') {
+            let string = [root_url.as_str(), link.as_str()].concat();
+            page_content.links[index] = string;
+        }
+    }
 
     crawled_urls.extend(page_content.links.clone());
 
     let crawled_page = crawl_page(&page_content, url);
 
-    println!("{:?}", crawled_page);
+    // println!("{:?}", crawled_page);
     
     return Ok(bytes.len());
 }
@@ -53,7 +67,7 @@ fn strip_html(bytes: &[u8]) -> Result<PageContent, &str> {
     for element in document.select(&link_selector) {
         let link = match element.attr("href") {
             Some(url) => url,
-            none => ""
+            None => ""
         };
 
         if link == "" {
