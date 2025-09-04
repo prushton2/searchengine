@@ -53,7 +53,7 @@ fn strip_html(bytes: &[u8]) -> Result<PageContent, &str> {
     for element in document.select(&link_selector) {
         let link = match element.attr("href") {
             Some(url) => url,
-            None => ""
+            none => ""
         };
 
         if link == "" {
