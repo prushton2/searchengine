@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 curl = "0.4.49"
 scraper = "0.24.0"
+tokio = { version="1.47.1", features=["full"] }
