@@ -4,18 +4,14 @@ use std::collections::HashMap;
 use std::collections::LinkedList;
 
 use curl::easy::{Easy};
-use tokio;
 
 mod crawl_page;
 
-#[tokio::main]
-async fn main() {
+fn main() {
     let mut urlqueue: LinkedList<String> = LinkedList::from([String::from("https://example.com")]);
     let mut usedurls: HashMap<String, u64> = [].into();
     
     loop {
-        //one page a second (good? idk)
-        sleep(Duration::new(1, 0));
         let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH);
         
         let url: String = match urlqueue.pop_front() {
@@ -24,7 +20,8 @@ async fn main() {
         };
         
         // dont redo a url within a week
-        if usedurls.contains_key(&url) && *usedurls.get(&url).expect("") < now.clone().expect("").as_secs(){
+        if usedurls.contains_key(&url) && *usedurls.get(&url).expect("") > now.clone().expect("").as_secs(){
+            println!("Used {}", url);
             continue;
         }
         
@@ -36,9 +33,10 @@ async fn main() {
             url.clone(),
             now.expect("what").as_secs() + 86400 * 7
         );
-
-        println!("{:?}", urlqueue);
-        println!("{:?}", usedurls);
+        
+        //one page a second only on successful scrapes (good? idk)
+        println!("{}", url);
+        sleep(Duration::new(1, 0));
     }
 }
 

@@ -1,8 +1,12 @@
 use std::str;
+use std::collections::HashMap;
+use std::time::SystemTime;
+use std::fs;
+use std::io::Write;
 use curl::easy::WriteError;
 use scraper::{Html, Selector};
-use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
+use serde::Serialize;
+use serde_json;
 
 #[derive(Clone)]
 struct PageContent {
@@ -10,7 +14,7 @@ struct PageContent {
     text: String
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 struct CrawledPage {
     version: u32,
     url: String,
@@ -36,7 +40,9 @@ pub fn process_out(bytes: &[u8], url: &str, crawled_urls: &mut Vec<String>) -> R
     crawled_urls.extend(page_content.links.clone());
 
     let crawled_page = crawl_page(&page_content, url);
-    
+
+    let _ = write_to_file(&crawled_page.unwrap());
+
     return Ok(bytes.len());
 }
 
@@ -93,4 +99,25 @@ fn crawl_page(page: &PageContent, url: &str) -> Result<CrawledPage, String> {
     }
 
     Ok(crawled_page)
+}
+
+fn write_to_file(crawled_page: &CrawledPage) -> Result<&'static str, &'static str> {
+    let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).expect("").as_secs();
+    let filename = ["../crawler_output/", now.to_string().as_str(), ".json"].concat();
+
+    let file_result = fs::File::create(filename);
+    let serialized = serde_json::to_string(&crawled_page);
+
+    if serialized.is_err() {
+        return Err("Serialization Failed");
+    }
+
+    if file_result.is_err() {
+        return Err("Error opening file");
+    }
+
+    let mut file = file_result.unwrap();
+
+    let _ = file.write_all(serialized.unwrap().as_bytes());
+    return Ok("File Written")
 }
