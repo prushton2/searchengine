@@ -103,7 +103,7 @@ fn crawl_page(page: &PageContent, url: &str) -> Result<CrawledPage, String> {
 
 fn write_to_file(crawled_page: &CrawledPage) -> Result<&'static str, &'static str> {
     let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).expect("").as_secs();
-    let filename = ["../crawler_output/", now.to_string().as_str(), ".json"].concat();
+    let filename = ["../crawler_data/output/", now.to_string().as_str(), ".json"].concat();
 
     let file_result = fs::File::create(filename);
     let serialized = serde_json::to_string(&crawled_page);
