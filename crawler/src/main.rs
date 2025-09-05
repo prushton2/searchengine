@@ -2,7 +2,10 @@ use std::time::{Duration, SystemTime};
 use std::thread::sleep;
 use std::collections::HashMap;
 use std::collections::LinkedList;
+use std::fs;
+use std::io::Write;
 
+use serde_json;
 use curl::easy::{Easy};
 
 mod crawl_page;
@@ -10,7 +13,37 @@ mod crawl_page;
 fn main() {
     let mut urlqueue: LinkedList<String> = LinkedList::from([String::from("https://example.com")]);
     let mut usedurls: HashMap<String, u64> = [].into();
-    
+    if !fs::exists("../crawler_data").unwrap() {
+        let _ = fs::create_dir("../crawler_data");
+        let _ = fs::create_dir("../crawler_data/output");
+        let _ = fs::File::create("../crawler_data/urlqueue.json");
+        let _ = fs::File::create("../crawler_data/usedurls.json");
+    } else {
+        let urlqueue_file = match fs::read_to_string("../crawler_data/urlqueue.json") {
+            Ok(t) => t,
+            Err(t) => panic!("{}", t)
+        };
+
+        urlqueue = match serde_json::from_str(&urlqueue_file) {
+            Ok(t) => t,
+            Err(_t) => LinkedList::from([String::from("https://example.com")])
+        };
+
+        let usedurls_file = match fs::read_to_string("../crawler_data/usedurls.json") {
+            Ok(t) => t,
+            Err(t) => panic!("{}", t)
+        };
+        
+        usedurls = match serde_json::from_str(&usedurls_file) {
+            Ok(t) => t,
+            Err(_t) => [].into()
+        };
+    }
+
+    crawl_thread(&mut urlqueue, &mut usedurls);
+}
+
+fn crawl_thread(urlqueue: &mut LinkedList<String>, usedurls: &mut HashMap<String, u64>) {
     loop {
         let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH);
         
@@ -34,9 +67,30 @@ fn main() {
             now.expect("what").as_secs() + 86400 * 7
         );
         
+		let urlqueue_serialized = match serde_json::to_string(&urlqueue) {
+            Ok(t) => t,
+            Err(t) => panic!("{}", t)
+        };
+        
+		let usedurls_serialized = match serde_json::to_string(&usedurls) {
+            Ok(t) => t,
+            Err(t) => panic!("{}", t)
+        };
+        
+        let mut urlqueue_file = match fs::File::create("../crawler_data/urlqueue.json") {
+            Ok(t) => t,
+            Err(t) => panic!("{}", t)
+        };
+        let mut usedurls_file = match fs::File::create("../crawler_data/usedurls.json") {
+            Ok(t) => t,
+            Err(t) => panic!("{}", t)
+        };
+        
+		let _ = urlqueue_file.write_all(urlqueue_serialized.as_bytes());
+		let _ = usedurls_file.write_all(usedurls_serialized.as_bytes());
+        
         //one page a second only on successful scrapes (good? idk)
-        println!("{}", url);
-        sleep(Duration::new(1, 0));
+		sleep(Duration::new(1, 0));
     }
 }
 
