@@ -60,35 +60,21 @@ fn crawl_thread(urlqueue: &mut LinkedList<String>, usedurls: &mut HashMap<String
         
         //crawl it and store the crawled urls
         let crawled_urls = crawl_and_save(url.as_str());
-        urlqueue.extend(crawled_urls);
         
+        for crawled_url in crawled_urls {
+            if !usedurls.contains_key(&crawled_url) {
+                urlqueue.push_back(crawled_url);
+            }
+        }
+
         usedurls.insert(
             url.clone(),
             now.expect("what").as_secs() + 86400 * 7
         );
         
-		let urlqueue_serialized = match serde_json::to_string(&urlqueue) {
-            Ok(t) => t,
-            Err(t) => panic!("{}", t)
-        };
-        
-		let usedurls_serialized = match serde_json::to_string(&usedurls) {
-            Ok(t) => t,
-            Err(t) => panic!("{}", t)
-        };
-        
-        let mut urlqueue_file = match fs::File::create("../crawler_data/urlqueue.json") {
-            Ok(t) => t,
-            Err(t) => panic!("{}", t)
-        };
-        let mut usedurls_file = match fs::File::create("../crawler_data/usedurls.json") {
-            Ok(t) => t,
-            Err(t) => panic!("{}", t)
-        };
-        
-		let _ = urlqueue_file.write_all(urlqueue_serialized.as_bytes());
-		let _ = usedurls_file.write_all(usedurls_serialized.as_bytes());
-        
+        //save progress
+        write_to_file(&urlqueue, &usedurls);
+
         //one page a second only on successful scrapes (good? idk)
 		sleep(Duration::new(1, 0));
     }
@@ -120,4 +106,28 @@ fn crawl_and_save(url: &str) -> Vec<String>{
     let _ = crawl_page::process_out(&byte_array, url, &mut destinations);
 
     return destinations;
+}
+
+fn write_to_file(urlqueue: &LinkedList<String>, usedurls: &HashMap<String, u64>) {
+    let urlqueue_serialized = match serde_json::to_string(&urlqueue) {
+        Ok(t) => t,
+        Err(t) => panic!("{}", t)
+    };
+    
+    let usedurls_serialized = match serde_json::to_string(&usedurls) {
+        Ok(t) => t,
+        Err(t) => panic!("{}", t)
+    };
+    
+    let mut urlqueue_file = match fs::File::create("../crawler_data/urlqueue.json") {
+        Ok(t) => t,
+        Err(t) => panic!("{}", t)
+    };
+    let mut usedurls_file = match fs::File::create("../crawler_data/usedurls.json") {
+        Ok(t) => t,
+        Err(t) => panic!("{}", t)
+    };
+    
+    let _ = urlqueue_file.write_all(urlqueue_serialized.as_bytes());
+    let _ = usedurls_file.write_all(usedurls_serialized.as_bytes());
 }
