@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use std::time::SystemTime;
 use std::fs;
 use std::io::Write;
-use curl::easy::WriteError;
 use scraper::{Html, Selector};
 use serde::Serialize;
 use serde_json;
@@ -21,9 +20,12 @@ struct CrawledPage {
     words: HashMap<String, u32>
 }
 
-pub fn process_out(bytes: &[u8], url: &str, crawled_urls: &mut Vec<String>) -> Result<usize, WriteError> {
+pub fn process_out(bytes: &[u8], url: &str, crawled_urls: &mut Vec<String>) -> Result<usize, &'static str> {
     
-    let mut page_content = strip_html(bytes).unwrap();
+    let mut page_content = match strip_html(bytes) {
+        Ok(t) => t,
+        Err(t) => return Err(t)
+    };
 
     // resolve relative urls
     let mut root_url_iter = url.split("/");
@@ -46,12 +48,12 @@ pub fn process_out(bytes: &[u8], url: &str, crawled_urls: &mut Vec<String>) -> R
     return Ok(bytes.len());
 }
 
-fn strip_html(bytes: &[u8]) -> Result<PageContent, &str> {
+fn strip_html(bytes: &[u8]) -> Result<PageContent, &'static str> {
     let mut page_content: PageContent = PageContent { links: vec![], text: String::from("") };
 
     let html: &str = match str::from_utf8(bytes) {
         Ok(v) => v,
-        Err(_e) => panic!("Not valid utf8")
+        Err(_e) => return Err("Could not decode text from bytes")
     };
 
     let document = Html::parse_document(html);
