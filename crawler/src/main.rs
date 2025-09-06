@@ -5,6 +5,7 @@ use std::collections::LinkedList;
 use std::fs;
 use std::io::Write;
 
+use url::Url;
 use serde_json;
 use curl::easy::{Easy};
 
@@ -42,6 +43,8 @@ fn main() {
         };
     }
 
+    println!("{:?}", urlqueue);
+
     crawler_thread(&mut urlqueue, &mut usedurls);
 }
 
@@ -53,41 +56,78 @@ fn crawler_thread(urlqueue: &mut LinkedList<(String, u8)>, usedurls: &mut HashMa
             Some(t) => t,
             None => {println!("Crawler ran out of urls"); break}
         };
+
+        println!("Crawling url {}", &url.0);
         
         // dont redo a url within a week
         if usedurls.contains_key(&url.0) && *usedurls.get(&url.0).expect("") > now.clone().expect("").as_secs(){
             println!("Used {}", url.0);
             continue;
         }
-        
-        //crawl it and store the crawled urls
-        let crawled_urls = crawl_and_save(url.0.as_str());
-        
-        for crawled_url in crawled_urls {
-            if !usedurls.contains_key(&crawled_url.0) {
-                urlqueue.push_back(crawled_url);
+
+        //fetch url
+        let bytes_vec = fetch_url(&url.0).unwrap();
+        let bytes_slice = bytes_vec.as_slice();
+
+        //convert bytes to page content
+        let page_content = match crawl_page::strip_html(&bytes_slice) {
+            Ok(t) => t,
+            Err(_t) => { println!("Failed to strip html from {}, skipping", &url.0); continue }
+        };
+
+        //append crawled urls to urlqueue and increment depth
+        let host: String = get_host_from_url(&url.0).unwrap();
+
+        for crawled_url in &page_content.links {
+            let mut depth = url.1;
+
+            if usedurls.contains_key(crawled_url) {
+                continue;
+            }
+
+            // resolve things like "/domains" to "iana.org/domains"
+            let mut formatted_url; 
+            if crawled_url.chars().nth(0) == Some('/') {
+                formatted_url = ["http://", &host, &crawled_url].concat();
+            } 
+            // ignore heading links, these dont tell us anything we dont already know
+            else if crawled_url.chars().nth(0) == Some('#') { 
+                continue;
+            } 
+            else {
+                formatted_url = crawled_url.to_string();
+            }
+
+            // increment depth
+            let formatted_url_host: String = get_host_from_url(&formatted_url).unwrap();
+            if formatted_url_host == host {
+                depth += 1;
+            } else {
+                depth = 0;
+            }
+
+            // only append if depth isnt too deep
+            if depth <= MAX_CRAWL_DEPTH {
+                urlqueue.push_back((formatted_url.clone(), depth));
             }
         }
 
-        usedurls.insert(
-            url.0.clone(),
-            now.expect("what").as_secs() + 86400 * 7
-        );
-        
+        //convert pagecontent to crawled url
+        let crawled_page = create_crawled_page_object(&page_content, &url.0).unwrap();
+
+        //write crawledurl to disk
+        let _ = write_crawled_page_to_file(&crawled_page);
+
         //save progress
         write_mem_to_file(&urlqueue, &usedurls);
 
         //one page a second only on successful scrapes (good? idk)
-		sleep(Duration::new(1, 0));
+		sleep(Duration::new(5, 0));
     }
 }
 
-fn crawl_and_save(url: &str) -> Vec<(String, u8)>{
-
-    let mut destinations: Vec<(String, u8)> = vec![];
+fn fetch_url(url: &str) -> Result<Vec<u8>, &'static str> {
     let mut out_vec = Vec::new();
-
-    // curl is scoped to ensure the borrow of out_vec is released before other use
     {
         let mut curl = Easy::new();
         curl.url(url).unwrap();
@@ -102,36 +142,8 @@ fn crawl_and_save(url: &str) -> Vec<(String, u8)>{
         
         transfer.perform().unwrap();
     }
-
-    let byte_array: &[u8] = out_vec.as_slice();
-
-    // create the crawled page struct
-    let crawled_page = crawl_page::crawl_page(&byte_array, url).unwrap();
-
-    let _ = write_crawled_page_to_file(&crawled_page);
-
-    return destinations;
-}
-
-fn write_crawled_page_to_file(crawled_page: &crawl_page::CrawledPage) -> Result<&'static str, &'static str> {
-    let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).expect("").as_secs();
-    let filename = ["../crawler_data/output/", now.to_string().as_str(), ".json"].concat();
-
-    let file_result = fs::File::create(filename);
-    let serialized = serde_json::to_string(&crawled_page);
-
-    if serialized.is_err() {
-        return Err("Serialization Failed");
-    }
-
-    if file_result.is_err() {
-        return Err("Error opening file");
-    }
-
-    let mut file = file_result.unwrap();
-
-    let _ = file.write_all(serialized.unwrap().as_bytes());
-    return Ok("File Written")
+    
+    return Ok(out_vec);
 }
 
 fn write_mem_to_file(urlqueue: &LinkedList<(String, u8)>, usedurls: &HashMap<String, u64>) {
@@ -156,4 +168,37 @@ fn write_mem_to_file(urlqueue: &LinkedList<(String, u8)>, usedurls: &HashMap<Str
     
     let _ = urlqueue_file.write_all(urlqueue_serialized.as_bytes());
     let _ = usedurls_file.write_all(usedurls_serialized.as_bytes());
+}
+
+fn write_crawled_page_to_file(crawled_page: &crawl_page::CrawledPage) -> Result<&'static str, &'static str> {
+    let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).expect("").as_secs();
+    let filename = ["../crawler_data/output/", now.to_string().as_str(), ".json"].concat();
+
+    let file_result = fs::File::create(filename);
+    let serialized = serde_json::to_string(&crawled_page);
+
+    if serialized.is_err() {
+        return Err("Serialization Failed");
+    }
+
+    if file_result.is_err() {
+        return Err("Error opening file");
+    }
+
+    let mut file = file_result.unwrap();
+
+    let _ = file.write_all(serialized.unwrap().as_bytes());
+    return Ok("File Written")
+}
+
+fn get_host_from_url(url: &str) -> Result<String, &'static str> {
+    let parsed = match Url::parse(url) {
+        Ok(t) => t,
+        Err(_t) => return Err("Error parsing url string. Is it valid?")
+    };
+
+    return match parsed.host_str() {
+        Some(t) => Ok(t.to_string()),
+        None => Err("No hostname in url")
+    };
 }

@@ -1,50 +1,23 @@
 use std::str;
 use std::collections::HashMap;
 
-use url::Url;
 use serde::Serialize;
 use scraper::{Html, Selector};
 
 #[derive(Clone)]
-struct PageContent {
-    links: Vec<String>,
-    text: String
+pub struct PageContent {
+    pub links: Vec<String>,
+    pub text: String
 }
 
 #[derive(Debug, Serialize)]
 pub struct CrawledPage {
-    version: u32,
-    url: String,
-    words: HashMap<String, u32>
+    pub version: u32,
+    pub url: String,
+    pub words: HashMap<String, u32>
 }
 
-pub fn crawl_page(bytes: &[u8], url: &str) -> Result<CrawledPage, &'static str> {
-    
-    let mut page_content = match strip_html(bytes) {
-        Ok(t) => t,
-        Err(t) => return Err(t)
-    };
-
-    let url_host = get_host_from_url(&url).unwrap();
-    
-    for (index, link) in page_content.links.clone().into_iter().enumerate() {
-        // resolve relative urls
-        if link.chars().nth(0) == Some('/') {
-            let string = ["https://", &url_host, link.as_str()].concat(); //todo: fix this
-            page_content.links[index] = string;
-        }
-    }
-
-    // crawled_urls.extend(page_content.links.clone());
-
-    let crawled_page = create_crawled_page_object(&page_content, url).unwrap();
-
-    // let _ = write_to_file(&crawled_page.unwrap());
-
-    return Ok(crawled_page);
-}
-
-fn strip_html(bytes: &[u8]) -> Result<PageContent, &'static str> {
+pub fn strip_html(bytes: &[u8]) -> Result<PageContent, &'static str> {
     let mut page_content: PageContent = PageContent { links: vec![], text: String::from("") };
 
     let html: &str = match str::from_utf8(bytes) {
@@ -79,7 +52,7 @@ fn strip_html(bytes: &[u8]) -> Result<PageContent, &'static str> {
     Ok(page_content)
 }
 
-fn create_crawled_page_object(page: &PageContent, url: &str) -> Result<CrawledPage, String> {
+pub fn create_crawled_page_object(page: &PageContent, url: &str) -> Result<CrawledPage, String> {
     let mut crawled_page = CrawledPage{
         version: 1,
         url: String::from(url),
@@ -97,16 +70,4 @@ fn create_crawled_page_object(page: &PageContent, url: &str) -> Result<CrawledPa
     }
 
     Ok(crawled_page)
-}
-
-fn get_host_from_url(url: &str) -> Result<String, &'static str> {
-    let parsed = match Url::parse(url) {
-        Ok(t) => t,
-        Err(_t) => return Err("Error parsing url string. Is it valid?")
-    };
-
-    return match parsed.host_str() {
-        Some(t) => Ok(t.to_string()),
-        None => Err("No hostname in url")
-    };
 }
