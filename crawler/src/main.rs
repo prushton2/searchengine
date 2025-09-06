@@ -5,7 +5,6 @@ use std::collections::LinkedList;
 use std::fs;
 use std::io::Write;
 
-use serde::Serialize;
 use serde_json;
 use curl::easy::{Easy};
 
@@ -65,13 +64,13 @@ fn crawler_thread(urlqueue: &mut LinkedList<(String, u8)>, usedurls: &mut HashMa
         let crawled_urls = crawl_and_save(url.0.as_str());
         
         for crawled_url in crawled_urls {
-            if !usedurls.contains_key(&crawled_url) {
+            if !usedurls.contains_key(&crawled_url.0) {
                 urlqueue.push_back(crawled_url);
             }
         }
 
         usedurls.insert(
-            url.clone(),
+            url.0.clone(),
             now.expect("what").as_secs() + 86400 * 7
         );
         
@@ -106,10 +105,10 @@ fn crawl_and_save(url: &str) -> Vec<(String, u8)>{
 
     let byte_array: &[u8] = out_vec.as_slice();
 
-    // create the crawled paage struct
-    let crawled_page = crawl_page::crawl_page(&byte_array, url);
+    // create the crawled page struct
+    let crawled_page = crawl_page::crawl_page(&byte_array, url).unwrap();
 
-    write_crawled_page_to_file(&crawled_page);
+    let _ = write_crawled_page_to_file(&crawled_page);
 
     return destinations;
 }
@@ -135,7 +134,7 @@ fn write_crawled_page_to_file(crawled_page: &crawl_page::CrawledPage) -> Result<
     return Ok("File Written")
 }
 
-fn write_mem_to_file(urlqueue: &LinkedList<String>, usedurls: &HashMap<String, u64>) {
+fn write_mem_to_file(urlqueue: &LinkedList<(String, u8)>, usedurls: &HashMap<String, u64>) {
     let urlqueue_serialized = match serde_json::to_string(&urlqueue) {
         Ok(t) => t,
         Err(t) => panic!("{}", t)
