@@ -1,11 +1,9 @@
 use std::str;
 use std::collections::HashMap;
-use std::time::SystemTime;
-use std::fs;
-use std::io::Write;
-use scraper::{Html, Selector};
+
+use url::Url;
 use serde::Serialize;
-use serde_json;
+use scraper::{Html, Selector};
 
 #[derive(Clone)]
 struct PageContent {
@@ -14,38 +12,36 @@ struct PageContent {
 }
 
 #[derive(Debug, Serialize)]
-struct CrawledPage {
+pub struct CrawledPage {
     version: u32,
     url: String,
     words: HashMap<String, u32>
 }
 
-pub fn process_out(bytes: &[u8], url: &str, crawled_urls: &mut Vec<String>) -> Result<usize, &'static str> {
+pub fn crawl_page(bytes: &[u8], url: &str) -> Result<CrawledPage, &'static str> {
     
     let mut page_content = match strip_html(bytes) {
         Ok(t) => t,
         Err(t) => return Err(t)
     };
 
-    // resolve relative urls
-    let mut root_url_iter = url.split("/");
-
-    let root_url: String = [root_url_iter.next().unwrap(), "//", root_url_iter.next().unwrap(), root_url_iter.next().unwrap()].concat();
-
+    let url_host = get_host_from_url(&url).unwrap();
+    
     for (index, link) in page_content.links.clone().into_iter().enumerate() {
+        // resolve relative urls
         if link.chars().nth(0) == Some('/') {
-            let string = [root_url.as_str(), link.as_str()].concat();
+            let string = ["https://", url_host, link.as_str()].concat(); //todo: fix this
             page_content.links[index] = string;
         }
     }
 
-    crawled_urls.extend(page_content.links.clone());
+    // crawled_urls.extend(page_content.links.clone());
 
-    let crawled_page = crawl_page(&page_content, url);
+    let crawled_page = create_crawled_page_object(&page_content, url).unwrap();
 
-    let _ = write_to_file(&crawled_page.unwrap());
+    // let _ = write_to_file(&crawled_page.unwrap());
 
-    return Ok(bytes.len());
+    return Ok(crawled_page);
 }
 
 fn strip_html(bytes: &[u8]) -> Result<PageContent, &'static str> {
@@ -83,7 +79,7 @@ fn strip_html(bytes: &[u8]) -> Result<PageContent, &'static str> {
     Ok(page_content)
 }
 
-fn crawl_page(page: &PageContent, url: &str) -> Result<CrawledPage, String> {
+fn create_crawled_page_object(page: &PageContent, url: &str) -> Result<CrawledPage, String> {
     let mut crawled_page = CrawledPage{
         version: 1,
         url: String::from(url),
@@ -103,23 +99,14 @@ fn crawl_page(page: &PageContent, url: &str) -> Result<CrawledPage, String> {
     Ok(crawled_page)
 }
 
-fn write_to_file(crawled_page: &CrawledPage) -> Result<&'static str, &'static str> {
-    let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).expect("").as_secs();
-    let filename = ["../crawler_data/output/", now.to_string().as_str(), ".json"].concat();
+fn get_host_from_url(url: &str) -> Result<&'static str, &'static str> {
+    let parsed = match Url::parse(url) {
+        Ok(t) => t,
+        Err(_t) => return Err("Error parsing url string. Is it valid?")
+    };
 
-    let file_result = fs::File::create(filename);
-    let serialized = serde_json::to_string(&crawled_page);
-
-    if serialized.is_err() {
-        return Err("Serialization Failed");
-    }
-
-    if file_result.is_err() {
-        return Err("Error opening file");
-    }
-
-    let mut file = file_result.unwrap();
-
-    let _ = file.write_all(serialized.unwrap().as_bytes());
-    return Ok("File Written")
+    return match parsed.host_str() {
+        Some(t) => Ok(t),
+        None => Err("No hostname in url")
+    };
 }

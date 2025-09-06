@@ -5,13 +5,16 @@ use std::collections::LinkedList;
 use std::fs;
 use std::io::Write;
 
+use serde::Serialize;
 use serde_json;
 use curl::easy::{Easy};
 
 mod crawl_page;
 
+const MAX_CRAWL_DEPTH: u8 = 5;
+
 fn main() {
-    let mut urlqueue: LinkedList<String> = LinkedList::from([String::from("https://example.com")]);
+    let mut urlqueue: LinkedList<(String, u8)> = LinkedList::from([(String::from("https://example.com"), 0)]);
     let mut usedurls: HashMap<String, u64> = [].into();
     if !fs::exists("../crawler_data").unwrap() {
         let _ = fs::create_dir("../crawler_data");
@@ -26,7 +29,7 @@ fn main() {
 
         urlqueue = match serde_json::from_str(&urlqueue_file) {
             Ok(t) => t,
-            Err(_t) => LinkedList::from([String::from("https://example.com")])
+            Err(_t) => LinkedList::from([(String::from("https://example.com"), 0)])
         };
 
         let usedurls_file = match fs::read_to_string("../crawler_data/usedurls.json") {
@@ -40,26 +43,26 @@ fn main() {
         };
     }
 
-    crawl_thread(&mut urlqueue, &mut usedurls);
+    crawler_thread(&mut urlqueue, &mut usedurls);
 }
 
-fn crawl_thread(urlqueue: &mut LinkedList<String>, usedurls: &mut HashMap<String, u64>) {
+fn crawler_thread(urlqueue: &mut LinkedList<(String, u8)>, usedurls: &mut HashMap<String, u64>) {
     loop {
         let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH);
         
-        let url: String = match urlqueue.pop_front() {
+        let url: (String, u8) = match urlqueue.pop_front() {
             Some(t) => t,
             None => {println!("Crawler ran out of urls"); break}
         };
         
         // dont redo a url within a week
-        if usedurls.contains_key(&url) && *usedurls.get(&url).expect("") > now.clone().expect("").as_secs(){
-            println!("Used {}", url);
+        if usedurls.contains_key(&url.0) && *usedurls.get(&url.0).expect("") > now.clone().expect("").as_secs(){
+            println!("Used {}", url.0);
             continue;
         }
         
         //crawl it and store the crawled urls
-        let crawled_urls = crawl_and_save(url.as_str());
+        let crawled_urls = crawl_and_save(url.0.as_str());
         
         for crawled_url in crawled_urls {
             if !usedurls.contains_key(&crawled_url) {
@@ -73,16 +76,16 @@ fn crawl_thread(urlqueue: &mut LinkedList<String>, usedurls: &mut HashMap<String
         );
         
         //save progress
-        write_to_file(&urlqueue, &usedurls);
+        write_mem_to_file(&urlqueue, &usedurls);
 
         //one page a second only on successful scrapes (good? idk)
 		sleep(Duration::new(1, 0));
     }
 }
 
-fn crawl_and_save(url: &str) -> Vec<String>{
+fn crawl_and_save(url: &str) -> Vec<(String, u8)>{
 
-    let mut destinations = vec![];
+    let mut destinations: Vec<(String, u8)> = vec![];
     let mut out_vec = Vec::new();
 
     // curl is scoped to ensure the borrow of out_vec is released before other use
@@ -103,12 +106,36 @@ fn crawl_and_save(url: &str) -> Vec<String>{
 
     let byte_array: &[u8] = out_vec.as_slice();
 
-    let _ = crawl_page::process_out(&byte_array, url, &mut destinations);
+    // create the crawled paage struct
+    let crawled_page = crawl_page::crawl_page(&byte_array, url);
+
+    write_crawled_page_to_file(&crawled_page);
 
     return destinations;
 }
 
-fn write_to_file(urlqueue: &LinkedList<String>, usedurls: &HashMap<String, u64>) {
+fn write_crawled_page_to_file(crawled_page: &crawl_page::CrawledPage) -> Result<&'static str, &'static str> {
+    let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).expect("").as_secs();
+    let filename = ["../crawler_data/output/", now.to_string().as_str(), ".json"].concat();
+
+    let file_result = fs::File::create(filename);
+    let serialized = serde_json::to_string(&crawled_page);
+
+    if serialized.is_err() {
+        return Err("Serialization Failed");
+    }
+
+    if file_result.is_err() {
+        return Err("Error opening file");
+    }
+
+    let mut file = file_result.unwrap();
+
+    let _ = file.write_all(serialized.unwrap().as_bytes());
+    return Ok("File Written")
+}
+
+fn write_mem_to_file(urlqueue: &LinkedList<String>, usedurls: &HashMap<String, u64>) {
     let urlqueue_serialized = match serde_json::to_string(&urlqueue) {
         Ok(t) => t,
         Err(t) => panic!("{}", t)
