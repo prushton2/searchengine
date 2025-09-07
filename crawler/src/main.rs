@@ -43,8 +43,6 @@ fn main() {
         };
     }
 
-    println!("{:?}", urlqueue);
-
     crawler_thread(&mut urlqueue, &mut usedurls);
 }
 
@@ -52,81 +50,108 @@ fn crawler_thread(urlqueue: &mut LinkedList<(String, u8)>, usedurls: &mut HashMa
     loop {
         let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH);
         
-        let url: (String, u8) = match urlqueue.pop_front() {
+        // get the url object from queue and do some preprocessing
+        let raw_url_object: (String, u8) = match urlqueue.pop_front() {
             Some(t) => t,
             None => {println!("Crawler ran out of urls"); break}
         };
 
-        println!("Crawling url {}", &url.0);
+        
+        let url_object = match Url::parse(&raw_url_object.0) {
+            Ok(mut t) => {filter_url(&mut t); t},
+            Err(_t) => continue
+        };
+        let url_string: &str = url_object.as_str();
+        let mut depth = raw_url_object.1;
+        
+        drop(raw_url_object);
         
         // dont redo a url within a week
-        if usedurls.contains_key(&url.0) && *usedurls.get(&url.0).expect("") > now.clone().expect("").as_secs(){
-            println!("Used {}", url.0);
+        if usedurls.contains_key(url_string) && *usedurls.get(url_string).expect("") > now.clone().expect("").as_secs(){
+            println!("Used {}", url_string);
             continue;
         }
 
-        //fetch url
-        let bytes_vec = fetch_url(&url.0).unwrap();
+        // fetch url as bytes
+        let bytes_vec = match fetch_url(&url_string) {
+            Ok(t) => t,
+            Err(_t) => { println!("Failed to get {}, skipping", &url_string); continue; }
+        };
         let bytes_slice = bytes_vec.as_slice();
 
-        //convert bytes to page content
+        // convert bytes to page content
         let page_content = match crawl_page::strip_html(&bytes_slice) {
             Ok(t) => t,
-            Err(_t) => { println!("Failed to strip html from {}, skipping", &url.0); continue }
+            Err(_t) => { println!("Failed to strip html from {}, skipping", &url_string); continue }
         };
+        
+        //append crawled urls to urlqueue, do some filtering, and increment depth
+        for raw_crawled_url in &page_content.links {
 
-        //append crawled urls to urlqueue and increment depth
-        let host: String = get_host_from_url(&url.0).unwrap();
-
-        for crawled_url in &page_content.links {
-            let mut depth = url.1;
-
-            if usedurls.contains_key(crawled_url) {
+            // Tries to parse a url. if it gets something like "/domains", it fails and then tries to join the path to the parent url,
+            // so it would spit out "iana.org/domains". It double fails on fragments (good thing, they are stupid anyways). Part of me 
+            // wants to make this an if statement but idiomatic code has corrupted me.
+            let crawled_url = match Url::parse(raw_crawled_url) {
+                Ok(mut t) => {
+                    filter_url(&mut t);
+                    t
+                },
+                Err(_t) => {
+                    match url_object.join(raw_crawled_url) {
+                        Ok(mut t) => {
+                            filter_url(&mut t);
+                            t
+                        },
+                        Err(_t) => continue
+                    }
+                }
+            };
+            
+            if usedurls.contains_key(raw_crawled_url) {
                 continue;
             }
 
-            // resolve things like "/domains" to "iana.org/domains"
-            let formatted_url; 
-            if crawled_url.chars().nth(0) == Some('/') {
-                formatted_url = ["http://", &host, &crawled_url].concat();
-            } 
-            // ignore heading links, these dont tell us anything we dont already know
-            else if crawled_url.chars().nth(0) == Some('#') { 
+            if url_object.scheme() != "https" && url_object.scheme() != "http" {
                 continue;
-            } 
-            else {
-                formatted_url = crawled_url.to_string();
             }
 
-            // increment depth
-            let formatted_url_host: String = get_host_from_url(&formatted_url).unwrap();
-            if formatted_url_host == host {
+            let crawled_url_host: &str = match crawled_url.domain() {
+                Some(t) => t,
+                None => panic!("No host in {}", crawled_url.as_str())
+            };
+            
+            if crawled_url_host == url_object.domain().unwrap() {
                 depth += 1;
             } else {
                 depth = 0;
             }
-
+    
             // only append if depth isnt too deep
             if depth <= MAX_CRAWL_DEPTH {
-                urlqueue.push_back((formatted_url.clone(), depth));
+                urlqueue.push_back((crawled_url.as_str().to_string(), depth));
             }
+
         }
-
+        
         //add to usedurls
-        usedurls.insert(url.0.clone(), now.expect("").as_secs() + 7 * 86400);
-
+        usedurls.insert(url_string.to_string(), now.expect("").as_secs() + 7 * 86400);
+        
         //convert pagecontent to crawled url
-        let crawled_page = crawl_page::create_crawled_page_object(&page_content, &url.0).unwrap();
-
+        let crawled_page = crawl_page::create_crawled_page_object(&page_content, url_string).unwrap();
+        
         //write crawledurl to disk
         let _ = write_crawled_page_to_file(&crawled_page);
-
+        
         //save progress
         write_mem_to_file(&urlqueue, &usedurls);
-
+        
         //one page a second only on successful scrapes (good? idk)
-		sleep(Duration::new(5, 0));
+        sleep(Duration::new(5, 0));
     }
+}
+
+fn filter_url(url: &mut url::Url) {
+    url.set_fragment(None);
 }
 
 fn fetch_url(url: &str) -> Result<Vec<u8>, &'static str> {
@@ -143,7 +168,10 @@ fn fetch_url(url: &str) -> Result<Vec<u8>, &'static str> {
             return Ok(bytes.len())
         }).unwrap();
         
-        transfer.perform().unwrap();
+        let result = transfer.perform();
+        if result.is_err() {
+            return Err("Transfer failed");
+        }
     }
     
     return Ok(out_vec);
@@ -192,16 +220,4 @@ fn write_crawled_page_to_file(crawled_page: &crawl_page::CrawledPage) -> Result<
 
     let _ = file.write_all(serialized.unwrap().as_bytes());
     return Ok("File Written")
-}
-
-fn get_host_from_url(url: &str) -> Result<String, &'static str> {
-    let parsed = match Url::parse(url) {
-        Ok(t) => t,
-        Err(_t) => return Err("Error parsing url string. Is it valid?")
-    };
-
-    return match parsed.host_str() {
-        Some(t) => Ok(t.to_string()),
-        None => Err("No hostname in url")
-    };
 }
