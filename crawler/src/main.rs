@@ -62,7 +62,7 @@ fn crawler_thread(urlqueue: &mut LinkedList<(String, u8)>, usedurls: &mut HashMa
             Err(_t) => continue
         };
         let url_string: &str = url_object.as_str();
-        let mut depth = raw_url_object.1;
+        let depth = raw_url_object.1;
         
         drop(raw_url_object);
         
@@ -87,6 +87,7 @@ fn crawler_thread(urlqueue: &mut LinkedList<(String, u8)>, usedurls: &mut HashMa
         
         //append crawled urls to urlqueue, do some filtering, and increment depth
         for raw_crawled_url in &page_content.links {
+
 
             // Tries to parse a url. if it gets something like "/domains", it fails and then tries to join the path to the parent url,
             // so it would spit out "iana.org/domains". It double fails on fragments (good thing, they are stupid anyways). Part of me 
@@ -119,16 +120,19 @@ fn crawler_thread(urlqueue: &mut LinkedList<(String, u8)>, usedurls: &mut HashMa
                 Some(t) => t,
                 None => panic!("No host in {}", crawled_url.as_str())
             };
+
+            let new_depth;
             
             if crawled_url_host == url_object.domain().unwrap() {
-                depth += 1;
+                println!("Depth: {}", depth);
+                new_depth = depth + 1;
             } else {
-                depth = 0;
+                new_depth = 0;
             }
     
             // only append if depth isnt too deep
             if depth <= MAX_CRAWL_DEPTH {
-                urlqueue.push_back((crawled_url.as_str().to_string(), depth));
+                urlqueue.push_back((crawled_url.as_str().to_string(), new_depth));
             }
 
         }
