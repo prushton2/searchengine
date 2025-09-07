@@ -68,7 +68,7 @@ fn crawler_thread(urlqueue: &mut LinkedList<(String, u8)>, usedurls: &mut HashMa
         
         // dont redo a url within a week
         if usedurls.contains_key(url_string) && *usedurls.get(url_string).expect("") > now.clone().expect("").as_secs(){
-            println!("Used {}", url_string);
+            // println!("Used {}", url_string);
             continue;
         }
 
@@ -112,13 +112,13 @@ fn crawler_thread(urlqueue: &mut LinkedList<(String, u8)>, usedurls: &mut HashMa
                 continue;
             }
 
-            if url_object.scheme() != "https" && url_object.scheme() != "http" {
+            if crawled_url.scheme() != "https" && crawled_url.scheme() != "http" {
                 continue;
             }
 
             let crawled_url_host: &str = match crawled_url.domain() {
                 Some(t) => t,
-                None => panic!("No host in {}", crawled_url.as_str())
+                None => continue
             };
 
             let new_depth;
