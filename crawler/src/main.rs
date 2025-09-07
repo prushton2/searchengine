@@ -124,7 +124,6 @@ fn crawler_thread(urlqueue: &mut LinkedList<(String, u8)>, usedurls: &mut HashMa
             let new_depth;
             
             if crawled_url_host == url_object.domain().unwrap() {
-                println!("Depth: {}", depth);
                 new_depth = depth + 1;
             } else {
                 new_depth = 0;
