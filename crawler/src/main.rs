@@ -86,7 +86,7 @@ fn crawler_thread(urlqueue: &mut LinkedList<(String, u8)>, usedurls: &mut HashMa
             }
 
             // resolve things like "/domains" to "iana.org/domains"
-            let mut formatted_url; 
+            let formatted_url; 
             if crawled_url.chars().nth(0) == Some('/') {
                 formatted_url = ["http://", &host, &crawled_url].concat();
             } 
@@ -112,8 +112,11 @@ fn crawler_thread(urlqueue: &mut LinkedList<(String, u8)>, usedurls: &mut HashMa
             }
         }
 
+        //add to usedurls
+        usedurls.insert(url.0.clone(), now.expect("").as_secs() + 7 * 86400);
+
         //convert pagecontent to crawled url
-        let crawled_page = create_crawled_page_object(&page_content, &url.0).unwrap();
+        let crawled_page = crawl_page::create_crawled_page_object(&page_content, &url.0).unwrap();
 
         //write crawledurl to disk
         let _ = write_crawled_page_to_file(&crawled_page);
