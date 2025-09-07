@@ -130,7 +130,7 @@ fn crawler_thread(urlqueue: &mut LinkedList<(String, u8)>, usedurls: &mut HashMa
             }
     
             // only append if depth isnt too deep
-            if depth <= MAX_CRAWL_DEPTH {
+            if depth < MAX_CRAWL_DEPTH {
                 urlqueue.push_back((crawled_url.as_str().to_string(), new_depth));
             }
 
