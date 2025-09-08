@@ -47,7 +47,7 @@ fn indexer_thread() {
 
         index_crawled_page(&crawled_page);
 
-        println!("{}", file_string);
+        // println!("{}", file_string);
     }
 }
 
@@ -57,11 +57,17 @@ fn index_crawled_page(crawled_page: &CrawledPage) {
             continue
         }
         word = word.to_lowercase();
+        let second_byte_index = match word.char_indices().nth(2) {
+            Some(t) => t.0,
+            None => continue
+        };
 
-        let path: PathBuf = Path::new(&BASEPATH).join(&word[0..2]).join(&word);
+        let first_two_chars = &word[0..second_byte_index];
+
+        let path: PathBuf = Path::new(&BASEPATH).join(first_two_chars).join(&word);
         
+        println!("{:?}", path.as_os_str());
 
-
-        println!("{:?}", word);
+        // println!("{:?}", word);
     }
 }
