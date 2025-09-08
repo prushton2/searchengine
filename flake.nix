@@ -17,6 +17,10 @@
           rustc
           openssl
           pkg-config
+
+          go
+          gcc
+          nodejs_24
         ];
       };
     };
