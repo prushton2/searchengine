@@ -55,7 +55,6 @@ fn crawler_thread(urlqueue: &mut LinkedList<(String, u8)>, usedurls: &mut HashMa
             Some(t) => t,
             None => {println!("Crawler ran out of urls"); break}
         };
-
         
         let url_object = match Url::parse(&raw_url_object.0) {
             Ok(mut t) => {filter_url(&mut t); t},
@@ -87,8 +86,6 @@ fn crawler_thread(urlqueue: &mut LinkedList<(String, u8)>, usedurls: &mut HashMa
         
         //append crawled urls to urlqueue, do some filtering, and increment depth
         for raw_crawled_url in &page_content.links {
-
-
             // Tries to parse a url. if it gets something like "/domains", it fails and then tries to join the path to the parent url,
             // so it would spit out "iana.org/domains". It double fails on fragments (good thing, they are stupid anyways). Part of me 
             // wants to make this an if statement but idiomatic code has corrupted me.
