@@ -1,14 +1,11 @@
 use std::fs;
-// use std::collections::HashMap;
-// use std::path::{PathBuf, Path};
-
 
 mod crawled_page;
+mod indexed_page;
 
 const BASEPATH: &str = "../indexer_data/indexed_sites";
 
 fn main() {
-    println!("Hello, world!");
     indexer_thread();
 }
 
@@ -18,7 +15,7 @@ fn indexer_thread() {
         Err(_t) => panic!("Couldnt read directory")
     };
 
-    println!("{:?}", files);
+    // println!("{:?}", files);
 
     for file_result in files {
         let file = match file_result {
@@ -31,11 +28,18 @@ fn indexer_thread() {
             Err(_t) => continue
         };
 
-        let page: crawled_page::CrawledPage = crawled_page::CrawledPage::from_string(&file_string).unwrap();
+        let page: crawled_page::V1 = crawled_page::V1::from_string(&file_string).unwrap();
 
         // todo: filter out fake words here
 
-        page.save(BASEPATH);
+        let indexed_page = match page.index() {
+            Ok(t) => t,
+            Err(_t) => continue
+        };
+
+        indexed_page.write(BASEPATH);
+
+
 
         // println!("{}", file_string);
     }
