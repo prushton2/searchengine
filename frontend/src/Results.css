@@ -4,3 +4,11 @@
   flex-direction: column;
   place-items: center;
 }
+
+.search_result {
+  background-color: #1a1a1a;
+  width: 80%;
+  margin-top: 1em;
+  padding: 1em;
+  border-radius: 8px;
+}

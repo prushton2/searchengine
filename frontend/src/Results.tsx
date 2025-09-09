@@ -31,7 +31,11 @@ function Results() {
     let element: JSX.Element[] = []
     
     Object.entries(result.urls).forEach(e => {
-      element.push(<a href={e[0]}>{e[0]}</a>)
+      element.push(<div className='search_result'>
+        <a href={e[0]}>{e[0]}</a>
+
+      </div>)
+      // element.push(
       element.push(<br />)
     })
     
