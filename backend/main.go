@@ -50,7 +50,13 @@ func search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, word := range search {
-		scoredURLs = addScoredURLs(get_word_score(word), scoredURLs)
+		var word_score, err = get_word_score(word)
+
+		if err != nil {
+			continue
+		}
+
+		scoredURLs = addScoredURLs(word_score, scoredURLs)
 	}
 
 	bytes, _ := json.Marshal(scoredURLs)
@@ -58,19 +64,19 @@ func search(w http.ResponseWriter, r *http.Request) {
 	io.Writer.Write(w, bytes)
 }
 
-func get_word_score(word string) ScoredURLs {
+func get_word_score(word string) (ScoredURLs, error) {
 	var url = fmt.Sprintf("../indexer_data/indexed_sites/%s/%s.json", word[0:2], word)
 	contents, err := os.ReadFile(url)
 
 	if err != nil {
-		fmt.Printf("	Err: %s\n", err)
+		return ScoredURLs{}, err
 	}
 
 	var indexedPage IndexedPage
 	err = json.Unmarshal(contents, &indexedPage)
 
 	if err != nil {
-		fmt.Printf("Err: %s\n", err)
+		return ScoredURLs{}, err
 	}
 
 	var scoredURLs ScoredURLs = ScoredURLs{
@@ -81,7 +87,7 @@ func get_word_score(word string) ScoredURLs {
 		scoredURLs.Urls[page[0].(string)] = page[1].(float64)
 	}
 
-	return scoredURLs
+	return scoredURLs, nil
 }
 
 func main() {
