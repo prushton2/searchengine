@@ -39,6 +39,9 @@ function Results() {
       element.push(<br />)
     })
     
+    if(element.length == 0) {
+      return [<p>No results found.</p>]
+    }
     return element
   }
 
