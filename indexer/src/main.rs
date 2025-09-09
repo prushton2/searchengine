@@ -50,8 +50,7 @@ fn indexer_thread() -> Result<&'static str, &'static str>{
 
         indexed_page.write_text(BASEPATH);
 
-        let result = indexed_page.write_metadata();
-        println!("index write: {:?}", result)
+        let _ = indexed_page.write_metadata();
     }
 
     return Ok("")

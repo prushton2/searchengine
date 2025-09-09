@@ -106,13 +106,12 @@ impl IndexedPage {
         // open file in r
         let mut file = match fs::File::options().read(true).open(path) {
             Ok(t) => t,
-            Err(t) => return Err("Cannot open file in r")
+            Err(_) => return Err("Cannot open file in r")
         };
         
         let mut file_contents: Metadata;
         let mut string: String = String::from("");
         let _ = file.read_to_string(&mut string);
-        println!("{}", string);
 
         // ensure object existence
         if string != "" {
@@ -137,11 +136,11 @@ impl IndexedPage {
 
         let mut file_writable = match fs::File::create(path) {
             Ok(t) => t,
-            Err(t) => return Err("Cannot open file in t")
+            Err(_) => return Err("Cannot open file in t")
         };
 
         match file_writable.write_all(serialized.as_bytes()) {
-            Ok(t) => return Ok("Write Successful"),
+            Ok(_) => return Ok("Write Successful"),
             Err(_) => return Err("Could not write to file")
         }
     }
