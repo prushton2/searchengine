@@ -16,6 +16,7 @@ The indexer takes crawled data and sorts it by word. A word must be 2 characters
 ## Issues
 * The indexer is bad at character lengths, since characters arent well defined in unicode
 * It is abysmally slow. I suspect this to be the many files written in quick succession, but i have yet to benchmark it
+* Fix some security issues by stripping characters
 
 # Backend
 The backend gets a search request and compiles the requested sites for the frontend
