@@ -50,7 +50,8 @@ fn indexer_thread() -> Result<&'static str, &'static str>{
 
         indexed_page.write_text(BASEPATH);
 
-        let _ = fs::remove_file(&file.path());
+        let result = indexed_page.write_metadata();
+        println!("index write: {:?}", result)
     }
 
     return Ok("")

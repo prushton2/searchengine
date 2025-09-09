@@ -28,7 +28,8 @@ impl V1 {
     pub fn index(self: &Self) -> Result<indexed_page::IndexedPage, &str> {
         let mut page: indexed_page::IndexedPage = indexed_page::IndexedPage{
             url: self.url.clone(),
-            words: [].into()
+            words: [].into(),
+            title: self.title.clone()
         };
 
         for (word, count) in self.words.clone().into_iter() {

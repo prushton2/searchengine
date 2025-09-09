@@ -3,13 +3,14 @@ use std::path::PathBuf;
 use std::collections::HashMap;
 use std::vec;
 use std::fs;
-use std::io::Write;
+use std::io::{Write, Read};
 
 use serde::{Serialize, Deserialize};
 use serde_json;
 
 pub struct IndexedPage {
     pub url: String,
+    pub title: String,
     pub words: HashMap<String, u64>
 }
 
@@ -51,7 +52,6 @@ impl IndexedPage {
             let mut path: PathBuf = Path::new(&basepath).join(first_two_chars).join(&word);
             path.set_extension("json");
 
-
             // ensure path exists and get the currently indexed data
             let mut file_contents = match get_indexed_word(&path, &dirbuilder) {
                 Ok(t) => t,
@@ -92,49 +92,58 @@ impl IndexedPage {
         }
     }
 
-    pub fn write_metadata(self: &Self, basepath: &str) -> Result<&'static str, &'static str> {
-        let path: PathBuf = Path::new("../indexer_data/site_metadata.json");
-        let file_contents: Metadata;
-
-        if path.exists() {
-            let filestring = match fs::read_to_string(path.as_os_str()) {
-                Ok(t) => t,
-                Err(_) => {return Err("Unable to open file")}
-            };
-
-            file_contents = match serde_json::from_str(&filestring) {
-                Ok(t) => t,
-                Err(_) => {return Err("Error deserializing file")}
-            };  
-        } else {
-            let dir_result = dirbuilder.create(&path.parent().unwrap());
-
-            if dir_result.is_err() {
-                return Err("Error building dirs")
-            }
-
-            let result = fs::File::create(&path);
-
-            if result.is_err() {
-                return Err("Error creating file");
-            }
-
-            file_contents = Metadata{
-                urls: [].into()
-            }
+    pub fn write_metadata(self: &Self) -> Result<&'static str, &'static str> {
+        let mut dirbuilder = fs::DirBuilder::new();
+        dirbuilder.recursive(true);
+        
+        let path = Path::new("../indexer_data/site_metadata.json");
+        // ensure existence
+        if !path.exists() {
+            let _ = dirbuilder.create(&path.parent().unwrap());
+            let _ = fs::File::create(&path);
         }
 
+        // open file in r
+        let mut file = match fs::File::options().read(true).open(path) {
+            Ok(t) => t,
+            Err(t) => return Err("Cannot open file in r")
+        };
+        
+        let mut file_contents: Metadata;
+        let mut string: String = String::from("");
+        let _ = file.read_to_string(&mut string);
+        println!("{}", string);
+
+        // ensure object existence
+        if string != "" {
+            file_contents = match serde_json::from_str(&string) {
+                Ok(t) => t,
+                Err(t) => panic!("Failed to deserialize struct {}", t)
+            };
+        } else {
+            file_contents = Metadata{urls: [].into()}
+        }
+
+        // update
         file_contents.urls.insert(self.url.clone(), SiteMetadata{
             title: self.title.clone()
         });
 
+        // write
         let serialized = match serde_json::to_string(&file_contents) {
             Ok(t) => t,
             Err(_t) => return Err("Error serializing metadata contents")
         };
 
-        let _ = fs::write_all(serialized.as_bytes());
+        let mut file_writable = match fs::File::create(path) {
+            Ok(t) => t,
+            Err(t) => return Err("Cannot open file in t")
+        };
 
+        match file_writable.write_all(serialized.as_bytes()) {
+            Ok(t) => return Ok("Write Successful"),
+            Err(_) => return Err("Could not write to file")
+        }
     }
 }
 
