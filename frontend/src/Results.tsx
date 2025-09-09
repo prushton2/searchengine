@@ -8,10 +8,19 @@ function Results() {
   const [searchBoxContents, setSearchBoxContents] = useState<string>("")
 
     useEffect(() => {
-      async function init() {
-        let scoredUrls = await Search("searchBoxContents")
+      const params = new URLSearchParams(window.location.search);
+      const query = params.get('q');
+      
+      if (query) {
+        setSearchBoxContents(query);
+        init(query)
       }
-      init()
+
+      async function init(query: string) {
+        let scoredUrls = await Search(query)
+        setSearchResult(scoredUrls);
+      }
+
     }, [])
 
     function runSearch() {
@@ -30,15 +39,15 @@ function Results() {
   }
 
   return (
-    <>
+    <div className='App_body'>
       <div className="card">
-        <input onChange={(e) => setSearchBoxContents(e.target.value) }/>
+        <input value={searchBoxContents} onChange={(e) => setSearchBoxContents(e.target.value) }/>
         <button onClick={() => runSearch()}>
           Search
         </button>
-        {searchResult == undefined ? "" : formatSearchResult(searchResult)}
       </div>
-    </>
+      {searchResult == undefined ? "" : formatSearchResult(searchResult)}
+    </div>
   )
 }
 

@@ -9,15 +9,13 @@ function App() {
   }
 
   return (
-    <>
+    <div className='App_body'>
       <h1>Search</h1>
       <div className="card">
         <input onChange={(e) => setSearchBoxContents(e.target.value) }/>
-        <button onClick={() => runSearch()}>
-          Search
-        </button>
+        <button onClick={() => runSearch()}>Search</button>
       </div>
-    </>
+    </div>
   )
 }
 
