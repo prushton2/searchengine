@@ -5,7 +5,7 @@ A search engine built in Rust, Go, and React. This is purely a project for learn
 The responsibility of the crawler is to find text and urls in a page. I use a queue with a depth limit of 4 to crawl pages, and i store the crawled page in a file named `timestamp.json`
 
 ## Issues
-* Currently, the crawler will only search a maximum depth of 4 into a website before entering another url. This doesnt work well, as any change in the url resets the depth
+* FIXED: Currently, the crawler will only search a maximum depth of 4 into a website before entering another url. This doesnt work well, as any change in the url resets the depth
 * The crawler is bad at filtering words. It will concatenate words in adjacent HTML elements, and cannot distinguish hex codes
 * Curl does not resolve 300 response codes, leading to pages that can only be searched with "Permanently Moved"
 * It should store site specific data (title, description, etc..)

@@ -8,6 +8,7 @@ use crate::page_content::PageContent;
 #[derive(Debug, Serialize)]
 pub struct CrawledPage {
     pub version: u32,
+    pub title: String,
     pub url: String,
     pub words: HashMap<String, u32>
 }
@@ -15,6 +16,7 @@ impl CrawledPage {
     pub fn from_page_content(page: &PageContent, url: &str) -> Result<CrawledPage, String> {
         let mut crawled_page = CrawledPage{
             version: 1,
+            title: String::from(page.title.clone()),
             url: String::from(url),
             words: [].into()
         };

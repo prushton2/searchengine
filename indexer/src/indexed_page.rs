@@ -33,7 +33,7 @@ impl IndexedPage {
             word = word.to_lowercase();
             let second_byte_index = match word.char_indices().nth(2) {
                 Some(t) => t.0,
-                None => {println!("Couldnt get first 2 chars of {}", word); continue}
+                None => {continue}
             };
 
             let first_two_chars = &word[0..second_byte_index];
