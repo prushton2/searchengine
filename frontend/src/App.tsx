@@ -1,28 +1,11 @@
-import { useState, type JSX } from 'react'
+import { useState } from 'react'
 import './App.css'
-import { type ScoredUrls } from './models/ScoredUrl'
-import { Search } from './API'
 
 function App() {
   const [searchBoxContents, setSearchBoxContents] = useState<string>("")
-  const [searchResult, setSearchResult] = useState<ScoredUrls>()
 
-  async function runSearch() {
-    let scoredUrls = await Search(searchBoxContents)
-    setSearchResult(scoredUrls)
-    console.log("scoredUrls: ")
-    console.log(scoredUrls)
-  }
-  
-  function formatSearchResult(result: ScoredUrls): JSX.Element[] {
-    let element: JSX.Element[] = []
-    
-    Object.entries(result.urls).forEach(e => {
-      element.push(<a href={e[0]}>{e[0]}</a>)
-      element.push(<br />)
-    })
-    
-    return element
+  function runSearch() {
+    window.location.href=`/search?q=${searchBoxContents}`
   }
 
   return (
@@ -33,9 +16,6 @@ function App() {
         <button onClick={() => runSearch()}>
           Search
         </button>
-        <br />
-        <br />
-        {searchResult == undefined ? "" : formatSearchResult(searchResult)}
       </div>
     </>
   )
