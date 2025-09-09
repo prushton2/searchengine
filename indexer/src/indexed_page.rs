@@ -18,8 +18,18 @@ pub struct IndexedWord {
     pub urls: Vec<(String, u64)>
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Metadata {
+    pub urls: HashMap<String, SiteMetadata>
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SiteMetadata {
+    pub title: String
+}
+
 impl IndexedPage {
-    pub fn write(self: &Self, basepath: &str) {
+    pub fn write_text(self: &Self, basepath: &str) {
         let mut dirbuilder = fs::DirBuilder::new();
         dirbuilder.recursive(true);
         
@@ -80,6 +90,51 @@ impl IndexedPage {
                 panic!("Error writing to file {:?}\n {:?}", path.as_os_str(), result.err());
             }
         }
+    }
+
+    pub fn write_metadata(self: &Self, basepath: &str) -> Result<&'static str, &'static str> {
+        let path: PathBuf = Path::new("../indexer_data/site_metadata.json");
+        let file_contents: Metadata;
+
+        if path.exists() {
+            let filestring = match fs::read_to_string(path.as_os_str()) {
+                Ok(t) => t,
+                Err(_) => {return Err("Unable to open file")}
+            };
+
+            file_contents = match serde_json::from_str(&filestring) {
+                Ok(t) => t,
+                Err(_) => {return Err("Error deserializing file")}
+            };  
+        } else {
+            let dir_result = dirbuilder.create(&path.parent().unwrap());
+
+            if dir_result.is_err() {
+                return Err("Error building dirs")
+            }
+
+            let result = fs::File::create(&path);
+
+            if result.is_err() {
+                return Err("Error creating file");
+            }
+
+            file_contents = Metadata{
+                urls: [].into()
+            }
+        }
+
+        file_contents.urls.insert(self.url.clone(), SiteMetadata{
+            title: self.title.clone()
+        });
+
+        let serialized = match serde_json::to_string(&file_contents) {
+            Ok(t) => t,
+            Err(_t) => return Err("Error serializing metadata contents")
+        };
+
+        let _ = fs::write_all(serialized.as_bytes());
+
     }
 }
 

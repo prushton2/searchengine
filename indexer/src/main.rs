@@ -48,7 +48,7 @@ fn indexer_thread() -> Result<&'static str, &'static str>{
             Err(_t) => continue
         };
 
-        indexed_page.write(BASEPATH);
+        indexed_page.write_text(BASEPATH);
 
         let _ = fs::remove_file(&file.path());
     }
