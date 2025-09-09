@@ -9,13 +9,16 @@ use url::Url;
 use serde_json;
 use curl::easy::{Easy};
 
-mod crawl_page;
+mod crawled_page;
+mod page_content;
 
 const MAX_CRAWL_DEPTH: u8 = 5;
 
 fn main() {
-    let mut urlqueue: LinkedList<(String, u8)> = LinkedList::from([(String::from("https://example.com"), 0)]);
+    // this is a deque, since there are 2 ways urls are crawled. If we encounter a new domain, the domain gets pushed to the back. If we get a url with the same domain, it gets pushed to the front and the depth is incremented
+    let mut urlqueue: LinkedList<(String, u8)> = LinkedList::from([(String::from("http://example.com"), 0)]);
     let mut usedurls: HashMap<String, u64> = [].into();
+
     if !fs::exists("../crawler_data").unwrap() {
         let _ = fs::create_dir("../crawler_data");
         let _ = fs::create_dir("../crawler_data/output");
@@ -29,7 +32,7 @@ fn main() {
 
         urlqueue = match serde_json::from_str(&urlqueue_file) {
             Ok(t) => t,
-            Err(_t) => LinkedList::from([(String::from("https://example.com"), 0)])
+            Err(_t) => LinkedList::from([(String::from("http://example.com"), 0)])
         };
 
         let usedurls_file = match fs::read_to_string("../crawler_data/usedurls.json") {
@@ -60,8 +63,10 @@ fn crawler_thread(urlqueue: &mut LinkedList<(String, u8)>, usedurls: &mut HashMa
             Ok(mut t) => {filter_url(&mut t); t},
             Err(_t) => continue
         };
+
         let url_string: &str = url_object.as_str();
         let depth = raw_url_object.1;
+
         
         drop(raw_url_object);
         
@@ -70,7 +75,9 @@ fn crawler_thread(urlqueue: &mut LinkedList<(String, u8)>, usedurls: &mut HashMa
             // println!("Used {}", url_string);
             continue;
         }
-
+        
+        println!("{}: {}", depth, url_string);
+        
         // fetch url as bytes
         let bytes_vec = match fetch_url(&url_string) {
             Ok(t) => t,
@@ -79,13 +86,13 @@ fn crawler_thread(urlqueue: &mut LinkedList<(String, u8)>, usedurls: &mut HashMa
         let bytes_slice = bytes_vec.as_slice();
 
         // convert bytes to page content
-        let page_content = match crawl_page::strip_html(&bytes_slice) {
+        let pagecontent = match page_content::PageContent::from_html(&bytes_slice) {
             Ok(t) => t,
             Err(_t) => { println!("Failed to strip html from {}, skipping", &url_string); continue }
         };
         
         //append crawled urls to urlqueue, do some filtering, and increment depth
-        for raw_crawled_url in &page_content.links {
+        for raw_crawled_url in &pagecontent.links {
             // Tries to parse a url. if it gets something like "/domains", it fails and then tries to join the path to the parent url,
             // so it would spit out "iana.org/domains". It double fails on fragments (good thing, they are stupid anyways). Part of me 
             // wants to make this an if statement but idiomatic code has corrupted me.
@@ -118,26 +125,22 @@ fn crawler_thread(urlqueue: &mut LinkedList<(String, u8)>, usedurls: &mut HashMa
                 None => continue
             };
 
-            let new_depth;
-            
             if crawled_url_host == url_object.domain().unwrap() {
-                new_depth = depth + 1;
+                // has to be nested since we dont want depth above max being put on the queue
+                if depth + 1 <= MAX_CRAWL_DEPTH { 
+                    urlqueue.push_front((crawled_url.as_str().to_string(), depth + 1));
+                }
             } else {
-                new_depth = 0;
+                
+                urlqueue.push_back((convert_url_to_domain(&crawled_url).to_string(), 0));
             }
-    
-            // only append if depth isnt too deep
-            if depth < MAX_CRAWL_DEPTH {
-                urlqueue.push_back((crawled_url.as_str().to_string(), new_depth));
-            }
-
         }
         
         //add to usedurls
         usedurls.insert(url_string.to_string(), now.expect("").as_secs() + 7 * 86400);
         
         //convert pagecontent to crawled url
-        let crawled_page = crawl_page::create_crawled_page_object(&page_content, url_string).unwrap();
+        let crawled_page = crawled_page::CrawledPage::from_page_content(&pagecontent, url_string).unwrap();
         
         //write crawledurl to disk
         let _ = write_crawled_page_to_file(&crawled_page);
@@ -152,6 +155,15 @@ fn crawler_thread(urlqueue: &mut LinkedList<(String, u8)>, usedurls: &mut HashMa
 
 fn filter_url(url: &mut url::Url) {
     url.set_fragment(None);
+    url.set_query(None);
+    let _ = url.set_scheme("http");
+}
+
+fn convert_url_to_domain(url: &url::Url) -> url::Url {
+    let mut converted_url = url.clone();
+    filter_url(&mut converted_url);
+    converted_url.set_path("");
+    return converted_url;
 }
 
 fn fetch_url(url: &str) -> Result<Vec<u8>, &'static str> {
@@ -201,7 +213,7 @@ fn write_mem_to_file(urlqueue: &LinkedList<(String, u8)>, usedurls: &HashMap<Str
     let _ = usedurls_file.write_all(usedurls_serialized.as_bytes());
 }
 
-fn write_crawled_page_to_file(crawled_page: &crawl_page::CrawledPage) -> Result<&'static str, &'static str> {
+fn write_crawled_page_to_file(crawled_page: &crawled_page::CrawledPage) -> Result<&'static str, &'static str> {
     let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).expect("").as_secs();
     let filename = ["../crawler_data/output/", now.to_string().as_str(), ".json"].concat();
 
