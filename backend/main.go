@@ -32,9 +32,18 @@ func addScoredURLs(self ScoredURLs, other ScoredURLs) ScoredURLs {
 }
 
 func search(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	query := r.URL.Query()
 	search := strings.Split(query.Get("s"), " ")
-	fmt.Fprintf(w, "Search terms: %v\n", search)
+	// fmt.Fprintf(w, "Search terms: %v\n", search)
 
 	var scoredURLs ScoredURLs = ScoredURLs{
 		Urls: make(map[string]float64),
