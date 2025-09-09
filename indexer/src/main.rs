@@ -31,12 +31,12 @@ fn indexer_thread() -> Result<&'static str, &'static str>{
     for file_result in files {
         let file = match file_result {
             Ok(t) => t,
-            Err(_t) => continue
+            Err(_t) => {println!("Error finding file"); continue}
         };
 
         let file_string = match fs::read_to_string(&file.path()) {
             Ok(t) => t,
-            Err(_t) => continue
+            Err(_t) => {println!("Error reading to string"); continue}
         };
 
         let page: crawled_page::V1 = crawled_page::V1::from_string(&file_string).unwrap();
@@ -45,12 +45,14 @@ fn indexer_thread() -> Result<&'static str, &'static str>{
 
         let indexed_page = match page.index() {
             Ok(t) => t,
-            Err(_t) => continue
+            Err(_t) => {println!("Error indexing page"); continue}
         };
 
         indexed_page.write_text(BASEPATH);
 
         let _ = indexed_page.write_metadata();
+
+        let _ = fs::remove_file(&file.path());
     }
 
     return Ok("")
