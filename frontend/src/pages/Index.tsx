@@ -3,50 +3,9 @@ import { SearchBar } from "@/components/SearchBar";
 import { SearchResults } from "@/components/SearchResults";
 import { useToast } from "@/components/ui/use-toast";
 import { Search } from "lucide-react";
-
-// Mock search results for demonstration
-const generateMockResults = (query: string) => [
-  {
-    id: "1",
-    title: `Understanding ${query}: A comprehensive guide`,
-    description: `Learn everything you need to know about ${query}. This comprehensive guide covers all the essential aspects, best practices, and practical applications you'll need to master this topic.`,
-    url: `https://example.com/guide-to-${query.toLowerCase().replace(/\s+/g, '-')}`,
-    domain: "example.com",
-    timestamp: "2 hours ago"
-  },
-  {
-    id: "2",
-    title: `${query} - Latest News and Updates`,
-    description: `Stay up to date with the latest developments in ${query}. Get breaking news, expert analysis, and insights from industry leaders covering recent trends and innovations.`,
-    url: `https://news.example.com/${query.toLowerCase().replace(/\s+/g, '-')}-updates`,
-    domain: "news.example.com",
-    timestamp: "1 day ago"
-  },
-  {
-    id: "3",
-    title: `How to get started with ${query}`,
-    description: `A beginner-friendly tutorial that walks you through the basics of ${query}. Perfect for newcomers looking to understand fundamental concepts and practical implementation strategies.`,
-    url: `https://tutorial.example.com/getting-started-${query.toLowerCase().replace(/\s+/g, '-')}`,
-    domain: "tutorial.example.com",
-    timestamp: "3 days ago"
-  },
-  {
-    id: "4",
-    title: `${query}: Best Practices and Tips`,
-    description: `Discover proven strategies and expert tips for working with ${query}. This article covers common pitfalls to avoid and optimization techniques used by professionals.`,
-    url: `https://blog.example.com/${query.toLowerCase().replace(/\s+/g, '-')}-best-practices`,
-    domain: "blog.example.com",
-    timestamp: "1 week ago"
-  },
-  {
-    id: "5",
-    title: `Advanced ${query} Techniques`,
-    description: `Take your ${query} skills to the next level with these advanced techniques and methodologies. Explore cutting-edge approaches used by experts in the field.`,
-    url: `https://advanced.example.com/${query.toLowerCase().replace(/\s+/g, '-')}-techniques`,
-    domain: "advanced.example.com",
-    timestamp: "2 weeks ago"
-  }
-];
+import { Search as APISearch } from "../API.tsx"
+import { type SearchResult as SearchResultType } from "@/models/SearchResults";
+import { sitemetadata } from "@/models/ScoredUrl";
 
 const Index = () => {
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -65,7 +24,26 @@ const Index = () => {
       await new Promise(resolve => setTimeout(resolve, 800));
       const endTime = Date.now();
       
-      const results = generateMockResults(query);
+      const scoredurls = await APISearch(query);
+
+      let sortedScoredURLs = Object.entries(scoredurls.urls).sort((a, b) => b[1] - a[1])
+
+      console.log(sortedScoredURLs);
+
+      let results: SearchResultType[] = []
+      
+      sortedScoredURLs.forEach((e, i) => {
+        let metadata: sitemetadata = scoredurls.metadata[e[0]];
+      
+        results.push({
+          id: `${i}`,
+          title: metadata.title,
+          description: "",
+          url: e[0],
+          domain: e[0]
+        })
+      })
+
       setSearchResults(results);
       setSearchTime((endTime - startTime) / 1000);
       
@@ -97,12 +75,12 @@ const Index = () => {
               <h1 className={`font-bold text-primary transition-all duration-500 ${
                 hasSearched ? 'text-2xl' : 'text-4xl'
               }`}>
-                DuckSearch
+                Search
               </h1>
             </div>
             {!hasSearched && (
               <p className="text-base text-muted-foreground max-w-xl mx-auto">
-                Privacy-focused search that doesn't track you. Find what you need without compromising your privacy.
+                Privacy focused search that wont keep track of your searches
               </p>
             )}
           </div>
@@ -124,7 +102,7 @@ const Index = () => {
             <SearchResults 
               results={searchResults}
               searchTime={searchTime}
-              totalResults={searchResults.length > 0 ? 1240000 : undefined}
+              totalResults={searchResults.length}
             />
           </div>
         </div>

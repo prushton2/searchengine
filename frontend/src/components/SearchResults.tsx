@@ -1,20 +1,6 @@
 import { ExternalLink, Clock, Globe } from "lucide-react";
 import { Card } from "@/components/ui/card";
-
-interface SearchResult {
-  id: string;
-  title: string;
-  description: string;
-  url: string;
-  domain: string;
-  timestamp?: string;
-}
-
-interface SearchResultsProps {
-  results: SearchResult[];
-  searchTime?: number;
-  totalResults?: number;
-}
+import { SearchResultsProps } from "@/models/SearchResults";
 
 export const SearchResults = ({ results, searchTime, totalResults }: SearchResultsProps) => {
   if (results.length === 0) {
