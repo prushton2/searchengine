@@ -1,6 +1,6 @@
 import { useEffect, useState, type JSX } from 'react'
 import './Results.css'
-import { type ScoredUrls } from './models/ScoredUrl'
+import { type ScoredUrls, type sitemetadata } from './models/ScoredUrl'
 import { Search } from './API'
 
 function Results() {
@@ -29,14 +29,23 @@ function Results() {
   
   function formatSearchResult(result: ScoredUrls): JSX.Element[] {
     let element: JSX.Element[] = []
-    
-    Object.entries(result.urls).forEach(e => {
-      element.push(<div className='search_result'>
-        <a href={e[0]}>{e[0]}</a>
 
-      </div>)
+    let sortedURLs =  Object.entries(result.urls).sort((a, b) => b[1] - a[1]);
+
+    // console.log(sortedURLs);
+    
+    sortedURLs.forEach(e => {
+
+      //@ts-ignore
+      let metadata: sitemetadata = result.metadata[e[0]]
+      element.push(
+        <div key={e[0]} className='search_result'>
+          <label>{metadata.title}</label><br />
+          <a href={e[0]} target='_blank'>{e[0]}</a>
+        </div>
+      )
       // element.push(
-      element.push(<br />)
+      element.push(<br key={e[0] + "br"}/>)
     })
     
     if(element.length == 0) {
