@@ -4,6 +4,7 @@ use std::thread::sleep;
 
 mod crawled_page;
 mod indexed_page;
+mod dictionary;
 
 const BASEPATH: &str = "../indexer_data/indexed_sites";
 
@@ -39,9 +40,9 @@ fn indexer_thread() -> Result<&'static str, &'static str>{
             Err(_t) => {println!("Error reading to string"); continue}
         };
 
-        let page: crawled_page::V1 = crawled_page::V1::from_string(&file_string).unwrap();
+        let mut page: crawled_page::V1 = crawled_page::V1::from_string(&file_string).unwrap();
 
-        // todo: filter out fake words here
+        let _ = page.filter_stop_words();
 
         let indexed_page = match page.index() {
             Ok(t) => t,
