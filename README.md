@@ -17,6 +17,7 @@ The indexer takes crawled data and sorts it by word. A word must be 2 characters
 ## Issues
 * It is abysmally slow. I suspect this to be the many files written in quick succession, but i have yet to benchmark it
 * Fix some security issues by stripping characters
+* This should use a real database
 * Strip non important words
 * DONE: The indexer is bad at character lengths, since characters arent well defined in unicode
 
