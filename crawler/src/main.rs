@@ -71,7 +71,8 @@ fn crawler_thread(urlqueue: &mut LinkedList<(String, u8)>, usedurls: &mut HashMa
         drop(raw_url_object);
         
         // dont redo a url within a week
-        if usedurls.contains_key(url_string) && *usedurls.get(url_string).expect("") > now.clone().expect("").as_secs(){
+        // CLONE DETECTED
+        if usedurls.contains_key(url_string) && *usedurls.get(url_string).expect("") > now.clone().expect("").as_secs(){ 
             // println!("Used {}", url_string);
             continue;
         }
