@@ -80,9 +80,9 @@ fn crawler_thread(urlqueue: &mut LinkedList<(String, u8)>, usedurls: &mut HashMa
         println!("{}: {}", depth, url_string);
         
         // fetch url as bytes
-        let bytes_vec = match fetch_url(&url_string) {
+        let bytes_vec = match reqwest_url(&url_string) {
             Ok(t) => t,
-            Err(_t) => { println!("Failed to get {}, skipping", &url_string); continue; }
+            Err(t) => { println!("Failed to get {}: {}, skipping", &url_string, t); continue; }
         };
         let bytes_slice = bytes_vec.as_slice();
 
@@ -167,7 +167,40 @@ fn convert_url_to_domain(url: &url::Url) -> url::Url {
     return converted_url;
 }
 
-fn fetch_url(url: &str) -> Result<Vec<u8>, &'static str> {
+fn reqwest_url(url: &str) -> Result<Vec<u8>, String> {
+    let client = reqwest::blocking::Client::builder()
+        .user_agent("Mozilla/5.0 (X11; Linux x86_64; rv:142.0) Gecko/20100101 Firefox/142.0")
+        .build()
+        .unwrap();
+    
+    let result = match client.get(url).send() {
+        Ok(t) => t,
+        Err(_) => return Err("Could not get URL".to_string())
+    };
+
+
+    if result.status().is_redirection() {
+        let redirect_to = match result.headers().get("location") {
+            Some(t) => t.to_str().unwrap(),
+            None => return Err("Couldnt find location header".to_string())
+        };
+
+        return reqwest_url(redirect_to);
+    }
+
+    if result.status().is_client_error() || result.status().is_server_error() {
+        return Err(format!("Status Code Invalid ({})", result.status().as_str()));
+    }
+
+    let bytes = match result.bytes() {
+        Ok(t) => t,
+        Err(_) => return Err("Could not get bytes".to_string())
+    };
+
+    return Ok(bytes.to_vec())
+}
+
+fn curl_url(url: &str) -> Result<Vec<u8>, &'static str> {
     let mut out_vec = Vec::new();
     {
         let mut curl = Easy::new();
