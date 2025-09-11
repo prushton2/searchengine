@@ -44,14 +44,14 @@ fn indexer_thread() -> Result<&'static str, &'static str>{
 
         let _ = page.filter_stop_words();
 
-        let indexed_page = match page.index() {
+        let mut indexedpage = match page.index() {
             Ok(t) => t,
             Err(_t) => {println!("Error indexing page"); continue}
         };
 
-        indexed_page.write_text(BASEPATH);
+        indexedpage.write_text(BASEPATH);
 
-        let _ = indexed_page.write_metadata();
+        let _ = indexedpage.write_metadata();
 
         let _ = fs::remove_file(&file.path());
     }

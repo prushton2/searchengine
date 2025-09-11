@@ -27,8 +27,9 @@ impl V1 {
     }
 
     pub fn filter_stop_words(self: &mut Self) -> Result<&'static str, &'static str> {
+
+        // cloning ensures i dont write to the active map, maybe theres something cheaper i can do
         for (word, _count) in self.words.clone().into_iter() {
-        
             match dictionary::DICTIONARY.get(&word as &str) {
                 Some(_) => {
                     self.words.remove(&word);
@@ -47,6 +48,7 @@ impl V1 {
             title: self.title.clone()
         };
 
+        // cloning this lets me pass ownership to page and consumes the clone
         for (word, count) in self.words.clone().into_iter() {
             page.words.insert(word, count);
         }

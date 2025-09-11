@@ -30,18 +30,19 @@ pub struct SiteMetadata {
 }
 
 impl IndexedPage {
-    pub fn write_text(self: &Self, basepath: &str) {
+    pub fn write_text(self: &mut Self, basepath: &str) {
         let mut dirbuilder = fs::DirBuilder::new();
         dirbuilder.recursive(true);
         
         // iterate over each word
-        for (mut word, new_score) in self.words.clone().into_iter() {
-            if word.len() < 3 || word.len() > 64{
+        // I can get away with not cloning this
+        for (raw_word, new_score) in self.words.iter_mut() {
+            if raw_word.len() < 3 || raw_word.len() > 64{
                 continue
             }
 
             // preprocessing (lowercase it, evaluate its path)
-            word = word.to_lowercase();
+            let word = raw_word.to_lowercase();
             let second_byte_index = match word.char_indices().nth(2) {
                 Some(t) => t.0,
                 None => {continue}
@@ -63,14 +64,14 @@ impl IndexedPage {
             for (index, (link, _old_score)) in file_contents.urls.clone().into_iter().enumerate() {
                 // check link, if same update score
                 if link == self.url {
-                    file_contents.urls[index].1 = new_score;
+                    file_contents.urls[index].1 = *new_score;
                     found = true;
                 }
             }
 
             // append to list if the url doesnt exist in the list already
             if !found {
-                file_contents.urls.push((self.url.clone(), new_score));
+                file_contents.urls.push((self.url.clone(), *new_score));
             }
 
             // write to disk
