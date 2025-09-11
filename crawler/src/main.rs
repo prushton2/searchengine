@@ -200,7 +200,7 @@ fn reqwest_url(url: &str) -> Result<Vec<u8>, String> {
     return Ok(bytes.to_vec())
 }
 
-fn curl_url(url: &str) -> Result<Vec<u8>, &'static str> {
+fn _curl_url(url: &str) -> Result<Vec<u8>, &'static str> {
     let mut out_vec = Vec::new();
     {
         let mut curl = Easy::new();
