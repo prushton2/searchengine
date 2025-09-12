@@ -32,3 +32,59 @@ The website to show the user their search query
 
 # Issues
 * NON ISSUE: It looks horrible
+
+
+# Database Schema
+
+## CrawledData
+```
+{
+    primary_key url: string 
+    title: string
+    description: string
+}
+```
+## CrawledWords
+```
+{
+    primary_key url: string
+    primary_key word: string
+    count: int
+}
+```
+
+## URLQueue
+```
+{
+    primary_key url: string
+    depth: int // only search 5 or so pages deep
+    priority: int // 0 means its part of the currently scraped url, 1 means its a different tld and should be scraped later
+}
+```
+
+## CrawledURLs
+```
+{
+    primary_key url: string,
+    crawled_again_at: int
+}
+```
+
+
+## IndexedData
+```
+{
+    primary_key url: string
+    primary_key word: string
+    weight: int
+}
+```
+
+## SiteMetadata
+```
+{
+    primary_key url: string
+    title: string
+    description: string
+}
+```

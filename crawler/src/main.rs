@@ -47,9 +47,12 @@ fn main() {
         };
     }
     let mut db = database::Database::new();
-    db.get();
-    return
-    // crawler_thread(&mut db, &mut urlqueue, &mut usedurls);
+    match db.set_schema() {
+        Ok(_) => {}
+        Err(t) => panic!("{}", t)
+    };
+    // return
+    crawler_thread(&mut db, &mut urlqueue, &mut usedurls);
 }
 
 fn crawler_thread(db: &mut database::Database, urlqueue: &mut LinkedList<(String, u8)>, usedurls: &mut HashMap<String, u64>) {
@@ -147,7 +150,8 @@ fn crawler_thread(db: &mut database::Database, urlqueue: &mut LinkedList<(String
         let crawled_page = crawled_page::CrawledPage::from_page_content(&pagecontent, url_string).unwrap();
         
         //write crawledurl to disk
-        let _ = write_crawled_page_to_file(&crawled_page);
+        // let _ = write_crawled_page_to_file(&crawled_page);
+        db.write_crawled_page(&crawled_page);
         
         //save progress
         write_mem_to_file(&urlqueue, &usedurls);
@@ -227,7 +231,7 @@ fn write_mem_to_file(urlqueue: &LinkedList<(String, u8)>, usedurls: &HashMap<Str
     let _ = usedurls_file.write_all(usedurls_serialized.as_bytes());
 }
 
-fn write_crawled_page_to_file(crawled_page: &crawled_page::CrawledPage) -> Result<&'static str, &'static str> {
+fn _write_crawled_page_to_file(crawled_page: &crawled_page::CrawledPage) -> Result<&'static str, &'static str> {
     let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).expect("").as_secs();
     let filename = ["../crawler_data/output/", now.to_string().as_str(), ".json"].concat();
 
