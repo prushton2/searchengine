@@ -11,6 +11,7 @@ use curl::easy::{Easy};
 
 mod crawled_page;
 mod page_content;
+mod database;
 
 const MAX_CRAWL_DEPTH: u8 = 5;
 
@@ -45,11 +46,13 @@ fn main() {
             Err(_t) => [].into()
         };
     }
-
-    crawler_thread(&mut urlqueue, &mut usedurls);
+    let mut db = database::Database::new();
+    db.get();
+    return
+    // crawler_thread(&mut db, &mut urlqueue, &mut usedurls);
 }
 
-fn crawler_thread(urlqueue: &mut LinkedList<(String, u8)>, usedurls: &mut HashMap<String, u64>) {
+fn crawler_thread(db: &mut database::Database, urlqueue: &mut LinkedList<(String, u8)>, usedurls: &mut HashMap<String, u64>) {
     loop {
         let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH);
         

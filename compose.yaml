@@ -5,16 +5,16 @@ services:
     shm_size: 128mb
     volumes:
       - "./postgres-data/data:/var/lib/postgres/data/"
-    # env_file:
-    #   - .env
     ports:
       - 5432:5432
     environment:
-      POSTGRES_USER: username
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: default_database
+      POSTGRES_USER: ${POSTGRES_DB_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_DB_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB_DATABASE}
+
   adminer:
     image: adminer
     restart: always
     ports:
       - 8080:8080
+  
