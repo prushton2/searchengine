@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use url::Url;
 
 use serde::Deserialize;
 use serde_json;
@@ -51,6 +52,13 @@ impl V1 {
         // cloning this lets me pass ownership to page and consumes the clone
         for (word, count) in self.words.clone().into_iter() {
             page.words.insert(word, count);
+        }
+
+        let parsed_url = Url::parse(&self.url).unwrap();
+
+        // add the domain components so you can search 'google' and get google.com
+        for domain_string in parsed_url.host().unwrap().to_string().split('.') {
+            page.words.insert(domain_string.to_string(), 10);
         }
 
         return Ok(page)
