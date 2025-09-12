@@ -203,29 +203,6 @@ fn reqwest_url(url: &str) -> Result<Vec<u8>, String> {
     return Ok(bytes.to_vec())
 }
 
-fn _curl_url(url: &str) -> Result<Vec<u8>, &'static str> {
-    let mut out_vec = Vec::new();
-    {
-        let mut curl = Easy::new();
-        curl.url(url).unwrap();
-        curl.useragent("Mozilla/5.0 (X11; Linux x86_64; rv:142.0) Gecko/20100101 Firefox/142.0").unwrap();
-
-        let mut transfer = curl.transfer();
-        
-        let _ = transfer.write_function(|bytes| {
-            out_vec.extend_from_slice(bytes);
-            return Ok(bytes.len())
-        }).unwrap();
-        
-        let result = transfer.perform();
-        if result.is_err() {
-            return Err("Transfer failed");
-        }
-    }
-    
-    return Ok(out_vec);
-}
-
 fn write_mem_to_file(urlqueue: &LinkedList<(String, u8)>, usedurls: &HashMap<String, u64>) {
     let urlqueue_serialized = match serde_json::to_string(&urlqueue) {
         Ok(t) => t,
