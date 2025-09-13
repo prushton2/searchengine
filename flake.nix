@@ -17,11 +17,13 @@
           rustc
           openssl
           pkg-config
+          rustup
 
           go
           gcc
           nodejs_24
         ];
       };
-    };
+    }; /* rustup component add rust-src */
 }
+
