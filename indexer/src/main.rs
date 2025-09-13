@@ -42,29 +42,3 @@ fn indexer_thread(db: &mut database::Database) -> Result<&'static str, &'static 
 
     return Ok("")
 }
-
-
-// let file = match file_result {
-//     Ok(t) => t,
-//     Err(_t) => {println!("Error finding file"); continue}
-// };
-
-// let file_string = match fs::read_to_string(&file.path()) {
-//     Ok(t) => t,
-//     Err(_t) => {println!("Error reading to string"); continue}
-// };
-
-// let mut page: crawled_page::CrawledPage = crawled_page::CrawledPage::from_string(&file_string).unwrap();
-
-// let _ = page.filter_stop_words();
-
-// let mut indexedpage = match page.index() {
-//     Ok(t) => t,
-//     Err(_t) => {println!("Error indexing page"); continue}
-// };
-
-// indexedpage.write_text(BASEPATH);
-
-// let _ = indexedpage.write_metadata();
-
-// let _ = fs::remove_file(&file.path());
