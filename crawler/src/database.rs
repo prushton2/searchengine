@@ -52,7 +52,7 @@ impl Database {
                 crawl_again_at bigint
             );
 
-            CREATE TABLE IF NOT EXISTS IndexedData (
+            CREATE TABLE IF NOT EXISTS IndexedWords (
                 url varchar(512),
                 word varchar(512),
                 weight integer,
@@ -149,7 +149,7 @@ impl Database {
         ) {
             Ok(t) => t,
             // bad i know
-            Err(t) => return Ok(UsedUrlStatus::UrlDoesntExist)
+            Err(_t) => return Ok(UsedUrlStatus::UrlDoesntExist)
         };
 
         let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).expect("").as_secs();
