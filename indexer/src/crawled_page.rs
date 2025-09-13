@@ -8,23 +8,20 @@ use crate::indexed_page;
 use crate::dictionary;
 
 #[derive(Debug, Deserialize)]
-pub struct V1 {
-    pub version: u32,
+pub struct CrawledPage {
     pub title: String,
     pub url: String,
+    pub description: String,
     pub words: HashMap<String, u64>
 }
 
-impl V1 {
+impl CrawledPage {
     pub fn from_string(string: &str) -> Result<Self, &str> {
-        let object: V1 = match serde_json::from_str(&string) {
+        let object: CrawledPage = match serde_json::from_str(&string) {
             Ok(t) => t,
             Err(_t) => return Err("Error deserializing json")
         };
-        if object.version == 1 {
-            return Ok(object);
-        }
-        return Err("Invalid version, expected version 1")
+        return Ok(object);
     }
 
     pub fn filter_stop_words(self: &mut Self) -> Result<&'static str, &'static str> {
@@ -45,6 +42,7 @@ impl V1 {
     pub fn index(self: &Self) -> Result<indexed_page::IndexedPage, &str> {
         let mut page: indexed_page::IndexedPage = indexed_page::IndexedPage{
             url: self.url.clone(),
+            description: self.description.clone(),
             words: [].into(),
             title: self.title.clone()
         };
