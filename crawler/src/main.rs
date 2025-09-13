@@ -1,13 +1,7 @@
-use std::time::{Duration, SystemTime};
+use std::time::{Duration};
 use std::thread::sleep;
-use std::collections::HashMap;
-use std::collections::LinkedList;
-use std::fs;
-use std::io::Write;
 
 use url::Url;
-use serde_json;
-use curl::easy::{Easy};
 
 mod crawled_page;
 mod page_content;
@@ -16,51 +10,31 @@ mod database;
 const MAX_CRAWL_DEPTH: u8 = 5;
 
 fn main() {
-    // this is a deque, since there are 2 ways urls are crawled. If we encounter a new domain, the domain gets pushed to the back. If we get a url with the same domain, it gets pushed to the front and the depth is incremented
-    let mut urlqueue: LinkedList<(String, u8)> = LinkedList::from([(String::from("http://example.com"), 0)]);
-    let mut usedurls: HashMap<String, u64> = [].into();
-
-    if !fs::exists("../crawler_data").unwrap() {
-        let _ = fs::create_dir("../crawler_data");
-        let _ = fs::create_dir("../crawler_data/output");
-        let _ = fs::File::create("../crawler_data/urlqueue.json");
-        let _ = fs::File::create("../crawler_data/usedurls.json");
-    } else {
-        let urlqueue_file = match fs::read_to_string("../crawler_data/urlqueue.json") {
-            Ok(t) => t,
-            Err(t) => panic!("{}", t)
-        };
-
-        urlqueue = match serde_json::from_str(&urlqueue_file) {
-            Ok(t) => t,
-            Err(_t) => LinkedList::from([(String::from("http://example.com"), 0)])
-        };
-
-        let usedurls_file = match fs::read_to_string("../crawler_data/usedurls.json") {
-            Ok(t) => t,
-            Err(t) => panic!("{}", t)
-        };
-        
-        usedurls = match serde_json::from_str(&usedurls_file) {
-            Ok(t) => t,
-            Err(_t) => [].into()
-        };
-    }
     let mut db = database::Database::new();
+    
+    // set db schema
     match db.set_schema() {
         Ok(_) => {}
         Err(t) => panic!("{}", t)
     };
-    // return
-    crawler_thread(&mut db, &mut urlqueue, &mut usedurls);
+
+    // ensure there is a starter url
+    match db.urlqueue_get_front(false) {
+        Some(_) => {}, // not empty!
+        None => { // empty, add a starting url
+            let _ = db.urlqueue_push("https://example.com", 0, 0);
+        }
+    };
+
+    crawler_thread(&mut db);
 }
 
-fn crawler_thread(db: &mut database::Database, urlqueue: &mut LinkedList<(String, u8)>, usedurls: &mut HashMap<String, u64>) {
+fn crawler_thread(db: &mut database::Database) {
     loop {
-        let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH);
+        // let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH);
         
         // get the url object from queue and do some preprocessing
-        let raw_url_object: (String, u8) = match urlqueue.pop_front() {
+        let raw_url_object: (String, u8) = match db.urlqueue_get_front(true) {
             Some(t) => t,
             None => {println!("Crawler ran out of urls"); break}
         };
@@ -77,11 +51,10 @@ fn crawler_thread(db: &mut database::Database, urlqueue: &mut LinkedList<(String
         drop(raw_url_object);
         
         // dont redo a url within a week
-        // CLONE DETECTED
-        if usedurls.contains_key(url_string) && *usedurls.get(url_string).expect("") > now.clone().expect("").as_secs(){ 
-            // println!("Used {}", url_string);
-            continue;
-        }
+        match db.crawledurls_status(url_string).unwrap() {
+            database::UsedUrlStatus::CannotCrawlUrl => {continue;}
+            _ => {}
+        };
         
         println!("{}: {}", depth, url_string);
         
@@ -119,9 +92,10 @@ fn crawler_thread(db: &mut database::Database, urlqueue: &mut LinkedList<(String
                 }
             };
             
-            if usedurls.contains_key(raw_crawled_url) {
-                continue;
-            }
+            match db.crawledurls_status(raw_crawled_url).unwrap() {
+                database::UsedUrlStatus::CannotCrawlUrl => {continue;}
+                _ => {}
+            };
 
             if crawled_url.scheme() != "https" && crawled_url.scheme() != "http" {
                 continue;
@@ -135,26 +109,24 @@ fn crawler_thread(db: &mut database::Database, urlqueue: &mut LinkedList<(String
             if crawled_url_host == url_object.domain().unwrap() {
                 // has to be nested since we dont want depth above max being put on the queue
                 if depth + 1 <= MAX_CRAWL_DEPTH { 
-                    urlqueue.push_front((crawled_url.as_str().to_string(), depth + 1));
+                    // urlqueue.push_front((crawled_url.as_str().to_string(), depth + 1));
+                    let _ = db.urlqueue_push(crawled_url.as_str(), depth+1, 0);
                 }
             } else {
-                
-                urlqueue.push_back((convert_url_to_domain(&crawled_url).to_string(), 0));
+                let _ = db.urlqueue_push(convert_url_to_domain(&crawled_url).as_str(), 0, 1);
+                // urlqueue.push_back((convert_url_to_domain(&crawled_url).to_string(), 0));
             }
         }
         
         //add to usedurls
-        usedurls.insert(url_string.to_string(), now.expect("").as_secs() + 7 * 86400);
+        // usedurls.insert(url_string.to_string(), now.expect("").as_secs() + 7 * 86400);
+        let _ = db.crawledurls_add(url_string);
         
         //convert pagecontent to crawled url
         let crawled_page = crawled_page::CrawledPage::from_page_content(&pagecontent, url_string).unwrap();
         
         //write crawledurl to disk
-        // let _ = write_crawled_page_to_file(&crawled_page);
         db.write_crawled_page(&crawled_page);
-        
-        //save progress
-        write_mem_to_file(&urlqueue, &usedurls);
         
         //one page a second only on successful scrapes (good? idk)
         sleep(Duration::new(5, 0));
@@ -205,49 +177,4 @@ fn reqwest_url(url: &str) -> Result<Vec<u8>, String> {
     };
 
     return Ok(bytes.to_vec())
-}
-
-fn write_mem_to_file(urlqueue: &LinkedList<(String, u8)>, usedurls: &HashMap<String, u64>) {
-    let urlqueue_serialized = match serde_json::to_string(&urlqueue) {
-        Ok(t) => t,
-        Err(t) => panic!("{}", t)
-    };
-    
-    let usedurls_serialized = match serde_json::to_string(&usedurls) {
-        Ok(t) => t,
-        Err(t) => panic!("{}", t)
-    };
-    
-    let mut urlqueue_file = match fs::File::create("../crawler_data/urlqueue.json") {
-        Ok(t) => t,
-        Err(t) => panic!("{}", t)
-    };
-    let mut usedurls_file = match fs::File::create("../crawler_data/usedurls.json") {
-        Ok(t) => t,
-        Err(t) => panic!("{}", t)
-    };
-    
-    let _ = urlqueue_file.write_all(urlqueue_serialized.as_bytes());
-    let _ = usedurls_file.write_all(usedurls_serialized.as_bytes());
-}
-
-fn _write_crawled_page_to_file(crawled_page: &crawled_page::CrawledPage) -> Result<&'static str, &'static str> {
-    let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).expect("").as_secs();
-    let filename = ["../crawler_data/output/", now.to_string().as_str(), ".json"].concat();
-
-    let file_result = fs::File::create(filename);
-    let serialized = serde_json::to_string(&crawled_page);
-
-    if serialized.is_err() {
-        return Err("Serialization Failed");
-    }
-
-    if file_result.is_err() {
-        return Err("Error opening file");
-    }
-
-    let mut file = file_result.unwrap();
-
-    let _ = file.write_all(serialized.unwrap().as_bytes());
-    return Ok("File Written")
 }
