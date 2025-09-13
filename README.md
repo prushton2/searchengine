@@ -71,7 +71,7 @@ The website to show the user their search query
 ```
 
 
-## IndexedData
+## IndexedWords
 ```
 {
     primary_key url: string

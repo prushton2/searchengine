@@ -1,39 +1,34 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
-	"os"
 	"strings"
+
+	"prushton.com/search/database"
 )
 
-type IndexedPage struct {
-	Urls [][]any `json:"urls"`
-}
+// type IndexedPage struct {
+// 	Urls [][]any `json:"urls"`
+// }
 
-type SiteMetadata struct {
-	Title string `json:"title"`
-}
-
-type Metadata struct {
-	Urls map[string]SiteMetadata `json:"urls"`
-}
+// type Metadata struct {
+// 	Urls map[string]SiteMetadata `json:"urls"`
+// }
 
 type ScoredURLs struct {
-	Urls     map[string]float64      `json:"urls"`
-	Metadata map[string]SiteMetadata `json:"metadata"`
+	Words    map[string]float64               `json:"words"`
+	Metadata map[string]database.SiteMetadata `json:"metadata"`
 }
 
-func addScoredURLs(self ScoredURLs, other ScoredURLs) ScoredURLs {
-	for key, value := range other.Urls {
-		selfScore, exists := self.Urls[key]
+func addScoredURLs(self map[string]float64, other map[string]float64) map[string]float64 {
+	for key, value := range other {
+		selfScore, exists := self[key]
 
 		if exists {
-			self.Urls[key] = value + selfScore
+			self[key] = value + selfScore
 		} else {
-			self.Urls[key] = value
+			self[key] = value
 		}
 	}
 
@@ -52,84 +47,32 @@ func search(w http.ResponseWriter, r *http.Request) {
 
 	query := r.URL.Query()
 	search := strings.Split(query.Get("s"), " ")
-	// fmt.Fprintf(w, "Search terms: %v\n", search)
 
-	var scoredURLs ScoredURLs = ScoredURLs{
-		Urls:     make(map[string]float64),
-		Metadata: make(map[string]SiteMetadata),
+	conn, err := database.Connect()
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 
+	var allScores map[string]float64 = make(map[string]float64)
+
 	for _, word := range search {
-		var word_score, err = get_word_score(word)
+		scores, err := database.Get_words(conn, word)
 
 		if err != nil {
 			continue
 		}
 
-		scoredURLs = addScoredURLs(word_score, scoredURLs)
+		allScores = addScoredURLs(allScores, scores)
 	}
 
-	// fmt.Printf("%v\n", scoredURLs.Metadata)
+	var metadata = database.Get_site_metadata()
 
-	err := get_site_metadata(&scoredURLs)
-
-	if err != nil {
-		fmt.Printf("%s\n", err)
+	var scoredurls ScoredURLs = ScoredURLs{
+		Words: allScores,
 	}
 
-	bytes, _ := json.Marshal(scoredURLs)
-
-	io.Writer.Write(w, bytes)
-}
-
-func get_site_metadata(self *ScoredURLs) error {
-	contents, err := os.ReadFile("../indexer_data/site_metadata.json")
-
-	if err != nil {
-		return err
-	}
-
-	if self.Metadata == nil {
-		self.Metadata = make(map[string]SiteMetadata)
-	}
-
-	var metadata Metadata
-	err = json.Unmarshal(contents, &metadata)
-
-	for site := range self.Urls {
-		data, exists := metadata.Urls[site]
-		if !exists {
-			continue
-		}
-		self.Metadata[site] = data
-	}
-	return nil
-}
-
-func get_word_score(word string) (ScoredURLs, error) {
-	var url = fmt.Sprintf("../indexer_data/indexed_sites/%s/%s.json", word[0:2], word)
-	contents, err := os.ReadFile(url)
-
-	if err != nil {
-		return ScoredURLs{}, err
-	}
-
-	var indexedPage IndexedPage
-	err = json.Unmarshal(contents, &indexedPage)
-
-	if err != nil {
-		return ScoredURLs{}, err
-	}
-
-	var scoredURLs ScoredURLs = ScoredURLs{
-		Urls: make(map[string]float64),
-	}
-
-	for _, page := range indexedPage.Urls {
-		scoredURLs.Urls[page[0].(string)] = page[1].(float64)
-	}
-
-	return scoredURLs, nil
 }
 
 func main() {
