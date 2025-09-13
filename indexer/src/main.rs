@@ -27,17 +27,19 @@ fn main() {
 
 fn indexer_thread(db: &mut database::Database) -> Result<&'static str, &'static str>{
     for _i in 0..db.crawled_page_len() {
-        let crawledpage: crawled_page::CrawledPage = match db.get_crawled_page() {
+        let mut crawledpage: crawled_page::CrawledPage = match db.get_crawled_page() {
             Some(t) => t,
             None => {continue;}
         };
+
+        let _ = crawledpage.filter_stop_words();
         
         let indexedpage = match crawledpage.index() {
             Ok(t) => t,
             Err(_) => {continue;}
         };
 
-        db.write_indexed_metadata(&indexedpage);
+        let _ = db.write_indexed_metadata(&indexedpage);
     }
 
     return Ok("")

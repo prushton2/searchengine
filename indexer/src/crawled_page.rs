@@ -1,13 +1,9 @@
 use std::collections::HashMap;
 use url::Url;
 
-use serde::Deserialize;
-use serde_json;
-
 use crate::indexed_page;
 use crate::dictionary;
 
-#[derive(Debug, Deserialize)]
 pub struct CrawledPage {
     pub title: String,
     pub url: String,
@@ -16,14 +12,6 @@ pub struct CrawledPage {
 }
 
 impl CrawledPage {
-    pub fn from_string(string: &str) -> Result<Self, &str> {
-        let object: CrawledPage = match serde_json::from_str(&string) {
-            Ok(t) => t,
-            Err(_t) => return Err("Error deserializing json")
-        };
-        return Ok(object);
-    }
-
     pub fn filter_stop_words(self: &mut Self) -> Result<&'static str, &'static str> {
 
         // cloning ensures i dont write to the active map, maybe theres something cheaper i can do
