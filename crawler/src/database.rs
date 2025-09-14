@@ -153,7 +153,7 @@ impl Database {
         };
 
         let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).expect("").as_secs();
-        let expiry_time = used_url.get::<&str, i32>("crawl_again_at");
+        let expiry_time = used_url.get::<&str, i64>("crawl_again_at");
 
         if (expiry_time as u64) < now {
             return Ok(UsedUrlStatus::CanCrawlUrl);

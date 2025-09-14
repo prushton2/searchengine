@@ -20,9 +20,7 @@ const Index = () => {
     
     try {
       // Simulate search delay
-      const startTime = Date.now();
       await new Promise(resolve => setTimeout(resolve, 800));
-      const endTime = Date.now();
       
       const scoredurls = await APISearch(query);
 
@@ -45,7 +43,7 @@ const Index = () => {
       })
 
       setSearchResults(results);
-      setSearchTime((endTime - startTime) / 1000);
+      setSearchTime(scoredurls.elapsedtime / 1000);
       
       toast({
         title: "Search completed",

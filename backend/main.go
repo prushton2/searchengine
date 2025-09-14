@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"prushton.com/search/database"
 )
@@ -19,8 +20,9 @@ import (
 // }
 
 type ScoredURLs struct {
-	Words    map[string]float64               `json:"words"`
-	Metadata map[string]database.SiteMetadata `json:"metadata"`
+	Words       map[string]float64               `json:"words"`
+	Metadata    map[string]database.SiteMetadata `json:"metadata"`
+	ElapsedTime int64                            `json:"elapsedtime`
 }
 
 func addScoredURLs(self map[string]float64, other map[string]float64) map[string]float64 {
@@ -41,6 +43,8 @@ func search(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	start := time.Now().UnixNano() / int64(time.Millisecond)
 
 	if r.Method == http.MethodOptions {
 		w.WriteHeader(http.StatusOK)
@@ -83,9 +87,12 @@ func search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	end := time.Now().UnixNano() / int64(time.Millisecond)
+
 	var scoredurls ScoredURLs = ScoredURLs{
-		Words:    allScores,
-		Metadata: metadata,
+		Words:       allScores,
+		Metadata:    metadata,
+		ElapsedTime: end - start,
 	}
 
 	v, err := json.Marshal(scoredurls)
