@@ -29,8 +29,8 @@ impl Database {
         let result = self.client.batch_execute("
             CREATE TABLE IF NOT EXISTS CrawledData (
                 url varchar(512) PRIMARY KEY,
-                title varchar(128),
-                description varchar(512)
+                title varchar(512),
+                description varchar(1024)
             );
 
             CREATE TABLE IF NOT EXISTS CrawledWords (
@@ -103,8 +103,8 @@ impl Database {
         */
 
         match self.client.execute(
-            "INSERT INTO crawleddata VALUES ($1, $2, '');",
-            &[&crawledpage.url, &crawledpage.title]
+            "INSERT INTO crawleddata VALUES ($1, $2, $3);",
+            &[&crawledpage.url, &crawledpage.title, &crawledpage.description]
         ) {
             Ok(_) => {},
             Err(t) => panic!("Error writing to database: {}", t)

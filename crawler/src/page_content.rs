@@ -6,12 +6,13 @@ use scraper::{Html, Selector};
 pub struct PageContent {
     pub links: Vec<String>,
     pub title: String,
+    pub description: String,
     pub text: String
 }
 
 impl PageContent {
     pub fn from_html(bytes: &[u8]) -> Result<PageContent, &'static str> {
-        let mut pagecontent: PageContent = PageContent { links: vec![], text: String::from(""), title: String::from("") };
+        let mut pagecontent: PageContent = PageContent { links: vec![], text: String::from(""), title: String::from(""), description: String::from("") };
 
         let html: &str = match str::from_utf8(bytes) {
             Ok(v) => v,

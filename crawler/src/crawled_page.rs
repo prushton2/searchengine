@@ -10,6 +10,7 @@ pub struct CrawledPage {
     pub version: u32,
     pub title: String,
     pub url: String,
+    pub description: String,
     pub words: HashMap<String, u32>
 }
 impl CrawledPage {
@@ -18,8 +19,19 @@ impl CrawledPage {
             version: 1,
             title: String::from(page.title.clone()),
             url: String::from(url),
+            description: String::from(page.description.clone()),
             words: [].into()
         };
+
+        if crawled_page.title.len() > 512 {
+            crawled_page.title.truncate(512);
+        }
+        if crawled_page.url.len() > 512 {
+            crawled_page.url.truncate(512);
+        }
+        if crawled_page.description.len() > 1024 {
+            crawled_page.description.truncate(1024);
+        }
     
         for word in page.text.as_str().split(' ') {
             let trimmed = word.trim().chars().filter(|c| c.is_alphanumeric()).collect::<String>();
