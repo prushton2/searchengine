@@ -19,14 +19,9 @@ const Index = () => {
     setHasSearched(true);
     
     try {
-      // Simulate search delay
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
       const scoredurls = await APISearch(query);
 
       let sortedScoredURLs = Object.entries(scoredurls.words).sort((a, b) => b[1] - a[1])
-
-      console.log(sortedScoredURLs);
 
       let results: SearchResultType[] = []
       
@@ -97,7 +92,8 @@ const Index = () => {
         <div className="container mx-auto px-4 pb-12">
           <div className="max-w-3xl mx-auto">
             {/* Results */}
-            <SearchResults 
+            <SearchResults
+              isLoading={isLoading}
               results={searchResults}
               searchTime={searchTime}
               totalResults={searchResults.length}

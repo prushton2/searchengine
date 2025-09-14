@@ -8,6 +8,7 @@ export interface SearchResult {
 }
 
 export interface SearchResultsProps {
+  isLoading: boolean;
   results: SearchResult[];
   searchTime?: number;
   totalResults?: number;

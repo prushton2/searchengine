@@ -1,8 +1,18 @@
-import { ExternalLink, Clock, Globe } from "lucide-react";
+import { ExternalLink, Clock, Globe, Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { SearchResultsProps } from "@/models/SearchResults";
 
-export const SearchResults = ({ results, searchTime, totalResults }: SearchResultsProps) => {
+export const SearchResults = ({ results, isLoading, searchTime, totalResults }: SearchResultsProps) => {
+  if (isLoading) {
+    return (
+      <div className="text-center py-16">
+        <Loader2 className="mx-auto h-16 w-16 text-primary mb-4 animate-spin" />
+        <h3 className="text-xl font-medium text-foreground mb-2">Searching...</h3>
+        <p className="text-muted-foreground">Finding the best results for you</p>
+      </div>
+    );
+  }
+
   if (results.length === 0) {
     return (
       <div className="text-center py-16">
