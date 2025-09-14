@@ -26,7 +26,7 @@ const Index = () => {
       
       const scoredurls = await APISearch(query);
 
-      let sortedScoredURLs = Object.entries(scoredurls.urls).sort((a, b) => b[1] - a[1])
+      let sortedScoredURLs = Object.entries(scoredurls.words).sort((a, b) => b[1] - a[1])
 
       console.log(sortedScoredURLs);
 
@@ -38,7 +38,7 @@ const Index = () => {
         results.push({
           id: `${i}`,
           title: metadata.title,
-          description: "",
+          description: metadata.description,
           url: e[0],
           domain: e[0]
         })
