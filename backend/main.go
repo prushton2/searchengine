@@ -22,7 +22,7 @@ import (
 type ScoredURLs struct {
 	Words       map[string]float64               `json:"words"`
 	Metadata    map[string]database.SiteMetadata `json:"metadata"`
-	ElapsedTime int64                            `json:"elapsedtime`
+	ElapsedTime int64                            `json:"elapsedtime"`
 }
 
 func addScoredURLs(self map[string]float64, other map[string]float64) map[string]float64 {
