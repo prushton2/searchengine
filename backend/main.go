@@ -11,14 +11,6 @@ import (
 	"prushton.com/search/database"
 )
 
-// type IndexedPage struct {
-// 	Urls [][]any `json:"urls"`
-// }
-
-// type Metadata struct {
-// 	Urls map[string]SiteMetadata `json:"urls"`
-// }
-
 type ScoredURLs struct {
 	Words       map[string]float64               `json:"words"`
 	Metadata    map[string]database.SiteMetadata `json:"metadata"`
