@@ -74,6 +74,34 @@ impl Database {
     }
 
     pub fn write_crawled_page(self: &mut Self, crawledpage: &crawled_page::CrawledPage) {
+        for (word, count) in crawledpage.words.iter() {
+            if word.len() > 64 {
+                continue;
+            }
+            
+            let lowercaseword = word.to_lowercase();
+            match self.client.execute(
+                "INSERT INTO crawledwords VALUES ($1, $2, $3)
+                ON CONFLICT (url, word) 
+                DO UPDATE SET
+                count = $3",
+                &[&crawledpage.url, &lowercaseword, &(*count as i32)]
+            ) {
+                Ok(_) => {},
+                Err(t) => panic!("Error writing to database: {}", t)
+            };
+        }
+
+        /*  
+            This is at the end because i cant be bothered to lock the db
+            tldr: The crawleddata gets written -> indexer pops new crawleddata entry ->
+            indexer only gets some words, the rest arent written yet -> 
+            orphaned words build up over time
+
+            I solved this by ensuring the words are written before giving them a parent,
+            not ideal but it works
+        */
+
         match self.client.execute(
             "INSERT INTO crawleddata VALUES ($1, $2, '');",
             &[&crawledpage.url, &crawledpage.title]
@@ -81,24 +109,6 @@ impl Database {
             Ok(_) => {},
             Err(t) => panic!("Error writing to database: {}", t)
         };
-
-        for (word, count) in crawledpage.words.iter() {
-            if word.len() > 64 {
-                continue;
-            }
-
-            let lowercaseword = word.to_lowercase();
-            match self.client.execute(
-                "INSERT INTO crawledwords VALUES ($1, $2, $3)
-                ON CONFLICT (url, word) 
-                DO UPDATE SET
-                    count = $3",
-                &[&crawledpage.url, &lowercaseword, &(*count as i32)]
-            ) {
-                Ok(_) => {},
-                Err(t) => panic!("Error writing to database: {}", t)
-            };
-        }
     }
 
     pub fn urlqueue_get_front(self: &mut Self, pop: bool) -> Option<(String, u8)> {
