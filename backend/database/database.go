@@ -3,6 +3,7 @@ package database
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 
 	_ "github.com/lib/pq"
 )
@@ -48,18 +49,29 @@ func Get_words(db *sql.DB, word string) (map[string]float64, error) {
 	return wordmap, nil
 }
 
-func Get_site_metadata(db *sql.DB, query_urls []string) (SiteMetadata, error) {
-	row := db.QueryRow("SELECT * FROM sitemetadata WHERE url = $1", query_url)
+func Get_site_metadata(db *sql.DB, query_urls []string) (map[string]SiteMetadata, error) {
+	var query = fmt.Sprintf("SELECT * FROM sitemetadata WHERE url IN ('%s');", strings.Join(query_urls, "', '"))
+	// fmt.Printf("q: %s\n", query)
+	rows, err := db.Query(query)
 
-	var url string
-	var title string
-	var description string
+	if err != nil {
+		return map[string]SiteMetadata{}, err
+	}
 
-	row.Scan(&url, &title, &description)
+	var metadata map[string]SiteMetadata = make(map[string]SiteMetadata, 0)
 
-	var metadata SiteMetadata = SiteMetadata{
-		Title:       title,
-		Description: description,
+	for rows.Next() {
+		var url string
+		var title string
+		var description string
+
+		rows.Scan(&url, &title, &description)
+
+		metadata[url] = SiteMetadata{
+			Title:       title,
+			Description: description,
+		}
+
 	}
 
 	return metadata, nil

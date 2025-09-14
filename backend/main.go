@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -55,6 +57,7 @@ func search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// map of url and total score for query
 	var allScores map[string]float64 = make(map[string]float64)
 
 	for _, word := range search {
@@ -67,12 +70,31 @@ func search(w http.ResponseWriter, r *http.Request) {
 		allScores = addScoredURLs(allScores, scores)
 	}
 
-	var metadata = database.Get_site_metadata()
+	var urls []string = make([]string, 0)
 
-	var scoredurls ScoredURLs = ScoredURLs{
-		Words: allScores,
+	for key := range allScores {
+		urls = append(urls, key)
 	}
 
+	metadata, err := database.Get_site_metadata(conn, urls)
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	var scoredurls ScoredURLs = ScoredURLs{
+		Words:    allScores,
+		Metadata: metadata,
+	}
+
+	v, err := json.Marshal(scoredurls)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	io.Writer.Write(w, v)
 }
 
 func main() {
