@@ -7,7 +7,14 @@ mod dictionary;
 mod database;
 
 fn main() {
-    let mut db = database::Database::new();
+    let dbinfo = database::DBInfo{
+        host: dotenv::var("POSTGRES_DB_HOST").unwrap(),
+        username: dotenv::var("POSTGRES_DB_USER").unwrap(),
+        password: dotenv::var("POSTGRES_DB_PASSWORD").unwrap(),
+        dbname: dotenv::var("POSTGRES_DB_DATABASE").unwrap(),
+    };
+
+    let mut db = database::Database::new(&dbinfo);
 
     loop {
         let start = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).expect("").as_millis();

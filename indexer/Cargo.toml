@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+dotenv = "0.15.0"
 lazy_static = "1.5.0"
 postgres = "0.19.10"
 serde = { version="1.0.219", features=["std", "derive"]}

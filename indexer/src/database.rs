@@ -7,9 +7,17 @@ pub struct Database {
     client: Client,
 }
 
+pub struct DBInfo {
+    pub host: String,
+    pub username: String,
+    pub password: String,
+    pub dbname: String
+}
+
 impl Database {
-    pub fn new() -> Self {
-        let new_client = Client::connect("host=localhost user=user password=password dbname=maindb", NoTls).unwrap();
+    pub fn new(dbinfo: &DBInfo) -> Self {
+        let string: String = format!("host={} user={} password={} dbname={}", dbinfo.host, dbinfo.username, dbinfo.password, dbinfo.dbname);
+        let new_client = Client::connect(&string, NoTls).unwrap();
 
         let db: Self = Self{
             client: new_client,

@@ -1,4 +1,23 @@
 services:
+  crawler:
+    build: crawler
+    restart: always
+    environment:
+      POSTGRES_DB_USER: ${POSTGRES_DB_USER}
+      POSTGRES_DB_PASSWORD: ${POSTGRES_DB_PASSWORD}
+      POSTGRES_DB_DATABASE: ${POSTGRES_DB_DATABASE}
+      POSTGRES_DB_HOST: ${POSTGRES_DB_HOST}
+      MAX_CRAWL_DEPTH: ${MAX_CRAWL_DEPTH}
+
+  indexer:
+    build: indexer
+    restart: always
+    environment:
+      POSTGRES_DB_USER: ${POSTGRES_DB_USER}
+      POSTGRES_DB_PASSWORD: ${POSTGRES_DB_PASSWORD}
+      POSTGRES_DB_DATABASE: ${POSTGRES_DB_DATABASE}
+      POSTGRES_DB_HOST: ${POSTGRES_DB_HOST}
+      
   db:
     image: postgres
     restart: always
