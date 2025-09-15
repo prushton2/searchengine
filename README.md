@@ -1,6 +1,15 @@
 # Search Engine
 A search engine built in Rust, Go, and React. This is purely a project for learning, I dont recommend actually using it.
 
+# Sample env
+```.env
+POSTGRES_DB_USER=user
+POSTGRES_DB_PASSWORD=password
+POSTGRES_DB_DATABASE=maindb
+POSTGRES_DB_HOST=localhost
+MAX_CRAWL_DEPTH=5
+```
+
 # Crawler
 The responsibility of the crawler is to find text and urls in a page. I use a queue with a depth limit of 4 to crawl pages, and i store the crawled page in a file named `timestamp.json`
 

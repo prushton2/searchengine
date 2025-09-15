@@ -1,5 +1,6 @@
 use std::time::{Duration};
 use std::thread::sleep;
+use dotenv;
 
 use url::Url;
 
@@ -10,8 +11,15 @@ mod database;
 const MAX_CRAWL_DEPTH: u8 = 5;
 
 fn main() {
-    let mut db = database::Database::new();
-    
+
+    let mut dbinfo = database::DBInfo{
+        host: dotenv::var("POSTGRES_DB_HOST").unwrap(),
+        username: dotenv::var("POSTGRES_DB_USER").unwrap(),
+        password: dotenv::var("POSTGRES_DB_PASSWORD").unwrap(),
+        dbname: dotenv::var("POSTGRES_DB_DATABASE").unwrap(),
+    };
+
+    let mut db = database::Database::new(&dbinfo);
     // set db schema
     match db.set_schema() {
         Ok(_) => {}

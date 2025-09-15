@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 curl = "0.4.49"
+dotenv = "0.15.0"
 postgres = "0.19.10"
 reqwest = { version="0.12.23", features=["blocking"] }
 scraper = "0.24.0"
