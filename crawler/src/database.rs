@@ -151,7 +151,7 @@ impl Database {
 
     pub fn urlqueue_push(self: &mut Self, url: &str, depth: u8, priority: u8) -> Result<String, String> {
         match self.client.execute(
-            "INSERT INTO urlqueue VALUES ($1, $2, $3)",
+            "INSERT INTO urlqueue VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
             &[&url, &(depth as i32), &(priority as i32)]
         ) {
             Ok(_) => return Ok("Success".to_string()),
