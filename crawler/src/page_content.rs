@@ -54,7 +54,12 @@ impl PageContent {
 
         for element in document.select(&title_selector) {
             if pagecontent.title == "" {
-                pagecontent.title = element.text().nth(0).unwrap().to_string()
+                let first_title = match element.text().nth(0) {
+                    Some(t) => t.to_string(),
+                    None => continue
+                };
+
+                pagecontent.title = first_title.clone()
             }
         }
 
