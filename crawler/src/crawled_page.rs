@@ -3,6 +3,7 @@ use std::collections::HashMap;
 
 use serde::Serialize;
 
+use crate::database;
 use crate::page_content::PageContent;
 
 #[derive(Debug, Serialize)]
@@ -24,13 +25,13 @@ impl CrawledPage {
         };
 
         if crawled_page.title.len() > 512 {
-            crawled_page.title.truncate(512);
+            crawled_page.title = database::safe_truncate(&crawled_page.title, 512);
         }
         if crawled_page.url.len() > 512 {
-            crawled_page.url.truncate(512);
+            crawled_page.url = database::safe_truncate(&crawled_page.url, 512);
         }
         if crawled_page.description.len() > 1024 {
-            crawled_page.description.truncate(1024);
+            crawled_page.description = database::safe_truncate(&crawled_page.description, 1024);
         }
 
         let alphanumeric_text = page.text.replacen(|c| {!char::is_alphanumeric(c)}, " ", usize::MAX);

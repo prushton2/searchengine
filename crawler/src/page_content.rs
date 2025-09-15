@@ -1,6 +1,7 @@
 use std::str;
 
 use scraper::{Html, Selector};
+use crate::database;
 
 #[derive(Clone)]
 pub struct PageContent {
@@ -35,7 +36,7 @@ impl PageContent {
         pagecontent.description = pagecontent.text.clone();
 
         // formatting
-        pagecontent.description.truncate(512);
+        pagecontent.description = database::safe_truncate(&pagecontent.description, 512);
         pagecontent.description = pagecontent.description.replace("\n", " ");
 
         for element in document.select(&link_selector) {

@@ -186,3 +186,7 @@ impl Database {
         return Ok(UsedUrlStatus::NewUrl)
     }
 }
+
+pub fn safe_truncate(string: &String, count: usize) -> String {
+    return string.chars().take(count).collect();
+}
