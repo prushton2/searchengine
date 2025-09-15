@@ -12,7 +12,7 @@ const MAX_CRAWL_DEPTH: u8 = 5;
 
 fn main() {
 
-    let mut dbinfo = database::DBInfo{
+    let dbinfo = database::DBInfo{
         host: dotenv::var("POSTGRES_DB_HOST").unwrap(),
         username: dotenv::var("POSTGRES_DB_USER").unwrap(),
         password: dotenv::var("POSTGRES_DB_PASSWORD").unwrap(),
