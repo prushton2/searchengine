@@ -30,9 +30,9 @@ impl CrawledPage {
     pub fn index(self: &Self) -> Result<indexed_page::IndexedPage, &str> {
         let mut page: indexed_page::IndexedPage = indexed_page::IndexedPage{
             url: self.url.clone(),
+            title: self.title.clone(),
             description: self.description.clone(),
-            words: [].into(),
-            title: self.title.clone()
+            words: [].into()
         };
 
         // cloning this lets me pass ownership to page and consumes the clone
@@ -42,9 +42,16 @@ impl CrawledPage {
 
         let parsed_url = Url::parse(&self.url).unwrap();
 
+        // some extra postprocessing can be done to ensure we deal with .ext files
+
         // add the domain components so you can search 'google' and get google.com
         for domain_string in parsed_url.host().unwrap().to_string().split('.') {
             page.words.insert(domain_string.to_string(), 10);
+        }
+
+        // do the same with the path, but lower score
+        for path_component in parsed_url.path().replacen(|c| {!char::is_alphanumeric(c)}, " ", usize::MAX).split(' ') {
+            page.words.insert(path_component.to_string(), 5);
         }
 
         return Ok(page)
