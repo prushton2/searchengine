@@ -13,16 +13,15 @@ type SiteMetadata struct {
 	Description string `json:"description"`
 }
 
-const (
-	host     = "localhost"
-	port     = 5432
-	user     = "user"
-	password = "password"
-	dbname   = "maindb"
-)
+type DBInfo struct {
+	Host     string
+	User     string
+	Password string
+	Dbname   string
+}
 
-func Connect() (*sql.DB, error) {
-	psqlconn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", host, port, user, password, dbname)
+func Connect(dbinfo DBInfo) (*sql.DB, error) {
+	psqlconn := fmt.Sprintf("host=%s port=5432 user=%s password=%s dbname=%s sslmode=disable", dbinfo.Host, dbinfo.User, dbinfo.Password, dbinfo.Dbname)
 	return sql.Open("postgres", psqlconn)
 }
 

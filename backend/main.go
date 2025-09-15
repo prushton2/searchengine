@@ -1,13 +1,16 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
+	"github.com/joho/godotenv"
 	"prushton.com/search/database"
 )
 
@@ -16,6 +19,9 @@ type ScoredURLs struct {
 	Metadata    map[string]database.SiteMetadata `json:"metadata"`
 	ElapsedTime int64                            `json:"elapsedtime"`
 }
+
+var dbinfo database.DBInfo = database.DBInfo{}
+var conn *sql.DB = nil
 
 func addScoredURLs(self map[string]float64, other map[string]float64) map[string]float64 {
 	for key, value := range other {
@@ -46,10 +52,9 @@ func search(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	search := strings.Split(query.Get("s"), " ")
 
-	conn, err := database.Connect()
-
-	if err != nil {
+	if conn == nil {
 		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, "No database connection found")
 		return
 	}
 
@@ -76,6 +81,7 @@ func search(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, "Error getting metadata")
 		return
 	}
 
@@ -90,6 +96,7 @@ func search(w http.ResponseWriter, r *http.Request) {
 	v, err := json.Marshal(scoredurls)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
+		io.WriteString(w, "Error serializing object")
 		return
 	}
 
@@ -97,6 +104,25 @@ func search(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	err := godotenv.Load()
+
+	if err != nil {
+		fmt.Println("Error loading dotenv, exiting")
+		return
+	}
+
+	dbinfo.User = os.Getenv("POSTGRES_DB_USER")
+	dbinfo.Host = os.Getenv("POSTGRES_DB_HOST")
+	dbinfo.Password = os.Getenv("POSTGRES_DB_PASSWORD")
+	dbinfo.Dbname = os.Getenv("POSTGRES_DB_DATABASE")
+
+	conn, err = database.Connect(dbinfo)
+
+	if err != nil {
+		fmt.Println("Error connecting to database, exiting")
+		return
+	}
+
 	http.HandleFunc("/search", search)
 
 	fmt.Println("Running server")
