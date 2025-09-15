@@ -32,6 +32,9 @@ impl PageContent {
             }
         }
 
+        pagecontent.description = pagecontent.text.clone();
+        pagecontent.description.truncate(512);
+
         for element in document.select(&link_selector) {
             let link = match element.attr("href") {
                 Some(url) => url,
