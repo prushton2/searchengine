@@ -5,4 +5,6 @@ RUN apk add go gcc
 WORKDIR /app
 COPY . /app
 
-CMD ["go", "run", "."]
+RUN go build .
+
+CMD ["./search"]

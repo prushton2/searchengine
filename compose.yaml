@@ -2,6 +2,11 @@ services:
   crawler:
     build: crawler
     restart: always
+
+    depends_on:
+      db:
+        condition: service_started
+
     environment:
       POSTGRES_DB_USER: ${POSTGRES_DB_USER}
       POSTGRES_DB_PASSWORD: ${POSTGRES_DB_PASSWORD}
@@ -12,12 +17,34 @@ services:
   indexer:
     build: indexer
     restart: always
+
+    depends_on:
+      db:
+        condition: service_started
+
     environment:
       POSTGRES_DB_USER: ${POSTGRES_DB_USER}
       POSTGRES_DB_PASSWORD: ${POSTGRES_DB_PASSWORD}
       POSTGRES_DB_DATABASE: ${POSTGRES_DB_DATABASE}
       POSTGRES_DB_HOST: ${POSTGRES_DB_HOST}
-      
+
+  backend:
+    build: backend
+    restart: always
+
+    ports:
+      - 3333:3333
+
+    depends_on:
+      db:
+        condition: service_started
+    
+    environment:
+      POSTGRES_DB_USER: ${POSTGRES_DB_USER}
+      POSTGRES_DB_PASSWORD: ${POSTGRES_DB_PASSWORD}
+      POSTGRES_DB_DATABASE: ${POSTGRES_DB_DATABASE}
+      POSTGRES_DB_HOST: ${POSTGRES_DB_HOST}
+
   db:
     image: postgres
     restart: always

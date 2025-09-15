@@ -7,4 +7,6 @@ RUN apk add pkgconfig
 WORKDIR /app
 COPY . /app
 
-CMD ["cargo", "run"]
+RUN cargo build --release
+
+CMD ["./target/release/crawler"]
