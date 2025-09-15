@@ -50,12 +50,18 @@ impl CrawledPage {
         }
 
         // do the same with the path, but lower score
-        for path_component in parsed_url.path().replacen(|c| {!char::is_alphanumeric(c)}, " ", usize::MAX).split(' ') {
+        for path_component in Self::filter_text(parsed_url.path()).split(' ') {
+            if path_component == "" {
+                continue;
+            }
             page.words.insert(path_component.to_string(), 5);
         }
 
         return Ok(page)
-        
+    }
+
+    fn filter_text(string: &str) -> String {
+        return string.replacen(|c| {!char::is_alphanumeric(c)}, " ", usize::MAX)
     }
 
 }

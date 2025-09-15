@@ -32,8 +32,10 @@ impl CrawledPage {
         if crawled_page.description.len() > 1024 {
             crawled_page.description.truncate(1024);
         }
+
+        let alphanumeric_text = page.text.replacen(|c| {!char::is_alphanumeric(c)}, " ", usize::MAX);
     
-        for word in page.text.as_str().split(' ') {
+        for word in alphanumeric_text.as_str().split(' ') {
             let trimmed = word.trim().chars().filter(|c| c.is_alphanumeric()).collect::<String>();
     
             if trimmed == "" {
