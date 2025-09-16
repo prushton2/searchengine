@@ -184,7 +184,11 @@ fn reqwest_url(url: &str) -> Result<Vec<u8>, String> {
         None => return Err("No content type header".to_string())
     };
 
-    if !content_type.contains("text/html") {
+    if content_type.to_str().is_err() {
+        return Err("Error verifying content type header".to_string())
+    }
+
+    if !content_type.to_str().unwrap().contains("text/html") {
         return Err("Content type is not html".to_string())
     }
 
