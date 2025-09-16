@@ -179,6 +179,15 @@ fn reqwest_url(url: &str) -> Result<Vec<u8>, String> {
         return Err(format!("Status Code Invalid ({})", result.status().as_str()));
     }
 
+    let content_type = match result.headers().get("content-type") {
+        Some(t) => t,
+        None => return Err("No content type header".to_string())
+    };
+
+    if !content_type.contains("text/html") {
+        return Err("Content type is not html".to_string())
+    }
+
     let bytes = match result.bytes() {
         Ok(t) => t,
         Err(_) => return Err("Could not get bytes".to_string())
