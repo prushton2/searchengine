@@ -107,7 +107,7 @@ func main() {
 	err := godotenv.Load()
 
 	if err != nil {
-		fmt.Println("Error loading dotenv, exiting")
+		fmt.Printf("Error loading dotenv, %s\nexiting", err)
 		return
 	}
 
@@ -116,12 +116,16 @@ func main() {
 	dbinfo.Password = os.Getenv("POSTGRES_DB_PASSWORD")
 	dbinfo.Dbname = os.Getenv("POSTGRES_DB_DATABASE")
 
+	// fmt.Printf("username: %s\n", os.Getenv("POSTGRES_DB_USER"))
+
 	conn, err = database.Connect(dbinfo)
 
 	if err != nil {
 		fmt.Println("Error connecting to database, exiting")
 		return
 	}
+
+	// conn = connection
 
 	http.HandleFunc("/search", search)
 
