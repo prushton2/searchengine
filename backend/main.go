@@ -14,27 +14,46 @@ import (
 	"prushton.com/search/database"
 )
 
-type ScoredURLs struct {
-	Words       map[string]float64               `json:"words"`
+type HTTPResponse struct {
+	Urls        []string                         `json:"url"`
 	Metadata    map[string]database.SiteMetadata `json:"metadata"`
 	ElapsedTime int64                            `json:"elapsedtime"`
+}
+
+type ScoredURL struct {
+	// summed score of all the words
+	Score float64 `json:"score"`
+	// amount of words in the query mentioned in the page
+	OccurrencesInQuery int32 `json:"occurrencesInQuery"`
 }
 
 var dbinfo database.DBInfo = database.DBInfo{}
 var conn *sql.DB = nil
 
-func addScoredURLs(self map[string]float64, other map[string]float64) map[string]float64 {
-	for key, value := range other {
-		selfScore, exists := self[key]
+func addScoredURLs(self map[string]ScoredURL, other map[string]float64) map[string]ScoredURL {
+	// iterate over the other one
+	for key, otherValue := range other {
+		selfValue, exists := self[key]
 
 		if exists {
-			self[key] = value + selfScore
+			// if exists, we add the total score and increment the number of words the url has in the query
+			self[key] = ScoredURL{
+				Score:              selfValue.Score + otherValue,
+				OccurrencesInQuery: selfValue.OccurrencesInQuery + 1,
+			}
 		} else {
-			self[key] = value
+			// else create the entry
+			self[key] = ScoredURL{
+				Score:              otherValue,
+				OccurrencesInQuery: 1,
+			}
 		}
 	}
-
 	return self
+}
+
+func sortURLs(self map[string]ScoredURL) []string {
+
 }
 
 func search(w http.ResponseWriter, r *http.Request) {
@@ -59,21 +78,21 @@ func search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// map of url and total score for query
-	var allScores map[string]float64 = make(map[string]float64)
+	var Scores map[string]ScoredURL = make(map[string]ScoredURL)
 
 	for _, word := range search {
-		scores, err := database.Get_words(conn, word)
+		newURLs, err := database.Get_words(conn, word)
 
 		if err != nil {
 			continue
 		}
 
-		allScores = addScoredURLs(allScores, scores)
+		Scores = addScoredURLs(Scores, newURLs)
 	}
 
 	var urls []string = make([]string, 0)
 
-	for key := range allScores {
+	for key := range Scores {
 		urls = append(urls, key)
 	}
 
@@ -87,13 +106,13 @@ func search(w http.ResponseWriter, r *http.Request) {
 
 	end := time.Now().UnixNano() / int64(time.Millisecond)
 
-	var scoredurls ScoredURLs = ScoredURLs{
-		Words:       allScores,
+	var response HTTPResponse = HTTPResponse{
+		// Urls:        Scores,
 		Metadata:    metadata,
 		ElapsedTime: end - start,
 	}
 
-	v, err := json.Marshal(scoredurls)
+	v, err := json.Marshal(response)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		io.WriteString(w, "Error serializing object")
