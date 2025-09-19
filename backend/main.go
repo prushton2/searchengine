@@ -15,7 +15,7 @@ import (
 )
 
 type HTTPResponse struct {
-	Urls        []string                         `json:"url"`
+	Urls        map[string]ScoredURL             `json:"url"`
 	Metadata    map[string]database.SiteMetadata `json:"metadata"`
 	ElapsedTime int64                            `json:"elapsedtime"`
 }
@@ -25,6 +25,12 @@ type ScoredURL struct {
 	Score float64 `json:"score"`
 	// amount of words in the query mentioned in the page
 	OccurrencesInQuery int32 `json:"occurrencesInQuery"`
+}
+
+type SortableScoredURL struct {
+	Url                string  `json:"url"`
+	Score              float64 `json:"score"`
+	OccurrencesInQuery float64 `json:"occurrencesInQuery"`
 }
 
 var dbinfo database.DBInfo = database.DBInfo{}
@@ -50,10 +56,6 @@ func addScoredURLs(self map[string]ScoredURL, other map[string]float64) map[stri
 		}
 	}
 	return self
-}
-
-func sortURLs(self map[string]ScoredURL) []string {
-
 }
 
 func search(w http.ResponseWriter, r *http.Request) {
@@ -107,7 +109,7 @@ func search(w http.ResponseWriter, r *http.Request) {
 	end := time.Now().UnixNano() / int64(time.Millisecond)
 
 	var response HTTPResponse = HTTPResponse{
-		// Urls:        Scores,
+		Urls:        Scores,
 		Metadata:    metadata,
 		ElapsedTime: end - start,
 	}
@@ -123,6 +125,10 @@ func search(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	// fmt.Printf("%v\n", sortURLs(sampledata))
+
+	return
+
 	err := godotenv.Load()
 
 	if err != nil {
