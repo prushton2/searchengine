@@ -15,14 +15,14 @@ import (
 )
 
 type HTTPResponse struct {
-	Urls        map[string]ScoredURL             `json:"url"`
+	Urls        []string                         `json:"url"`
 	Metadata    map[string]database.SiteMetadata `json:"metadata"`
 	ElapsedTime int64                            `json:"elapsedtime"`
 }
 
 type ScoredURL struct {
 	// summed score of all the words
-	Score float64 `json:"score"`
+	Score int64 `json:"score"`
 	// amount of words in the query mentioned in the page
 	OccurrencesInQuery int32 `json:"occurrencesInQuery"`
 }
@@ -36,7 +36,7 @@ type SortableScoredURL struct {
 var dbinfo database.DBInfo = database.DBInfo{}
 var conn *sql.DB = nil
 
-func addScoredURLs(self map[string]ScoredURL, other map[string]float64) map[string]ScoredURL {
+func addScoredURLs(self map[string]ScoredURL, other map[string]int64) map[string]ScoredURL {
 	// iterate over the other one
 	for key, otherValue := range other {
 		selfValue, exists := self[key]
@@ -92,13 +92,20 @@ func search(w http.ResponseWriter, r *http.Request) {
 		Scores = addScoredURLs(Scores, newURLs)
 	}
 
-	var urls []string = make([]string, 0)
-
-	for key := range Scores {
-		urls = append(urls, key)
+	fmt.Println("----- Scored URLS")
+	for key, value := range Scores {
+		fmt.Printf("%s: %d %d\n", key, value.Score, value.OccurrencesInQuery)
 	}
 
-	metadata, err := database.Get_site_metadata(conn, urls)
+	// Sort the urls by score
+	SortedURLs := SortURLs(Scores)
+
+	fmt.Println("----- Sorted URLS")
+	for _, key := range SortedURLs {
+		fmt.Printf("%s\n", key)
+	}
+
+	metadata, err := database.Get_site_metadata(conn, SortedURLs)
 
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -109,7 +116,7 @@ func search(w http.ResponseWriter, r *http.Request) {
 	end := time.Now().UnixNano() / int64(time.Millisecond)
 
 	var response HTTPResponse = HTTPResponse{
-		Urls:        Scores,
+		Urls:        SortedURLs,
 		Metadata:    metadata,
 		ElapsedTime: end - start,
 	}
