@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/joho/godotenv"
 	"prushton.com/search/database"
 )
 
@@ -122,12 +121,13 @@ func search(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	err := godotenv.Load()
+	// err := godotenv.Load()
 
-	if err != nil {
-		fmt.Printf("Error loading dotenv, %s\nexiting", err)
-		return
-	}
+	// if err != nil {
+	// 	fmt.Printf("Error loading dotenv, %s\nexiting", err)
+	// 	return
+	// }
+	var err error
 
 	dbinfo.User = os.Getenv("POSTGRES_DB_USER")
 	dbinfo.Host = os.Getenv("POSTGRES_DB_HOST")
