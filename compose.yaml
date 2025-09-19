@@ -1,38 +1,38 @@
 services:
-  # crawler:
-  #   build: crawler
-  #   restart: always
+  crawler:
+    build: crawler
+    restart: always
 
-  #   depends_on:
-  #     db:
-  #       condition: service_healthy
+    depends_on:
+      db:
+        condition: service_healthy
 
-  #   env_file:
-  #     - .env
+    env_file:
+      - .env
 
-  #   # environment:
-  #   #   POSTGRES_DB_USER: ${POSTGRES_DB_USER}
-  #   #   POSTGRES_DB_PASSWORD: ${POSTGRES_DB_PASSWORD}
-  #   #   POSTGRES_DB_DATABASE: ${POSTGRES_DB_DATABASE}
-  #   #   POSTGRES_DB_HOST: ${POSTGRES_DB_HOST}
-  #   #   MAX_CRAWL_DEPTH: ${MAX_CRAWL_DEPTH}
+    # environment:
+    #   POSTGRES_DB_USER: ${POSTGRES_DB_USER}
+    #   POSTGRES_DB_PASSWORD: ${POSTGRES_DB_PASSWORD}
+    #   POSTGRES_DB_DATABASE: ${POSTGRES_DB_DATABASE}
+    #   POSTGRES_DB_HOST: ${POSTGRES_DB_HOST}
+    #   MAX_CRAWL_DEPTH: ${MAX_CRAWL_DEPTH}
 
-  # indexer:
-  #   build: indexer
-  #   restart: always
+  indexer:
+    build: indexer
+    restart: always
 
-  #   depends_on:
-  #     db:
-  #       condition: service_healthy
+    depends_on:
+      db:
+        condition: service_healthy
 
-  #   env_file:
-  #     - .env
+    env_file:
+      - .env
 
-  #   # environment:
-  #   #   POSTGRES_DB_USER: ${POSTGRES_DB_USER}
-  #   #   POSTGRES_DB_PASSWORD: ${POSTGRES_DB_PASSWORD}
-  #   #   POSTGRES_DB_DATABASE: ${POSTGRES_DB_DATABASE}
-  #   #   POSTGRES_DB_HOST: ${POSTGRES_DB_HOST}
+    # environment:
+    #   POSTGRES_DB_USER: ${POSTGRES_DB_USER}
+    #   POSTGRES_DB_PASSWORD: ${POSTGRES_DB_PASSWORD}
+    #   POSTGRES_DB_DATABASE: ${POSTGRES_DB_DATABASE}
+    #   POSTGRES_DB_HOST: ${POSTGRES_DB_HOST}
 
   backend:
     build: backend
