@@ -92,18 +92,8 @@ func search(w http.ResponseWriter, r *http.Request) {
 		Scores = addScoredURLs(Scores, newURLs)
 	}
 
-	fmt.Println("----- Scored URLS")
-	for key, value := range Scores {
-		fmt.Printf("%s: %d %d\n", key, value.Score, value.OccurrencesInQuery)
-	}
-
 	// Sort the urls by score
 	SortedURLs := SortURLs(Scores)
-
-	fmt.Println("----- Sorted URLS")
-	for _, key := range SortedURLs {
-		fmt.Printf("%s\n", key)
-	}
 
 	metadata, err := database.Get_site_metadata(conn, SortedURLs)
 
