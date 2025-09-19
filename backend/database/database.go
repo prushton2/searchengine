@@ -25,14 +25,14 @@ func Connect(dbinfo DBInfo) (*sql.DB, error) {
 	return sql.Open("postgres", psqlconn)
 }
 
-func Get_words(db *sql.DB, word string) (map[string]float64, error) {
+func Get_words(db *sql.DB, word string) (map[string]int64, error) {
 	rows, err := db.Query("SELECT * FROM indexedwords WHERE word = $1", word)
 
 	if err != nil {
 		return nil, err
 	}
 
-	var wordmap map[string]float64 = make(map[string]float64)
+	var wordmap map[string]int64 = make(map[string]int64)
 
 	for rows.Next() {
 
@@ -42,7 +42,7 @@ func Get_words(db *sql.DB, word string) (map[string]float64, error) {
 
 		rows.Scan(&url, &word, &weight)
 
-		wordmap[url] = float64(weight)
+		wordmap[url] = int64(weight)
 	}
 
 	return wordmap, nil
