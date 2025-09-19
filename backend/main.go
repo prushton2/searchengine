@@ -28,9 +28,9 @@ type ScoredURL struct {
 }
 
 type SortableScoredURL struct {
-	Url                string  `json:"url"`
-	Score              float64 `json:"score"`
-	OccurrencesInQuery float64 `json:"occurrencesInQuery"`
+	Url                string `json:"url"`
+	Score              int64  `json:"score"`
+	OccurrencesInQuery int64  `json:"occurrencesInQuery"`
 }
 
 var dbinfo database.DBInfo = database.DBInfo{}
@@ -125,10 +125,6 @@ func search(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	// fmt.Printf("%v\n", sortURLs(sampledata))
-
-	// return
-
 	err := godotenv.Load()
 
 	if err != nil {

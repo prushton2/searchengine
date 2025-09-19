@@ -1,83 +1,5 @@
 package main
 
-var sampledata map[string]ScoredURL = map[string]ScoredURL{
-	"ai domain 1": ScoredURL{
-		Score:              1,
-		OccurrencesInQuery: 2,
-	},
-	"ai domain 2": ScoredURL{
-		Score:              2,
-		OccurrencesInQuery: 2,
-	},
-	"ai domain 20": ScoredURL{
-		Score:              20,
-		OccurrencesInQuery: 2,
-	},
-	"ai domain 22": ScoredURL{
-		Score:              22,
-		OccurrencesInQuery: 2,
-	},
-	"ai 1": ScoredURL{
-		Score:              1,
-		OccurrencesInQuery: 1,
-	},
-	"ai 2": ScoredURL{
-		Score:              2,
-		OccurrencesInQuery: 1,
-	},
-	"domain 1": ScoredURL{
-		Score:              1,
-		OccurrencesInQuery: 1,
-	},
-	"domain 2": ScoredURL{
-		Score:              2,
-		OccurrencesInQuery: 1,
-	},
-}
-
-var sampleSortableScoredURLs []SortableScoredURL = []SortableScoredURL{
-	SortableScoredURL{
-		Url:                "ai domain 1",
-		Score:              1,
-		OccurrencesInQuery: 2,
-	},
-	SortableScoredURL{
-		Url:                "ai domain 2",
-		Score:              2,
-		OccurrencesInQuery: 2,
-	},
-	SortableScoredURL{
-		Url:                "ai domain 20",
-		Score:              20,
-		OccurrencesInQuery: 2,
-	},
-	SortableScoredURL{
-		Url:                "ai domain 22",
-		Score:              22,
-		OccurrencesInQuery: 2,
-	},
-	SortableScoredURL{
-		Url:                "ai 1",
-		Score:              1,
-		OccurrencesInQuery: 1,
-	},
-	SortableScoredURL{
-		Url:                "ai 2",
-		Score:              2,
-		OccurrencesInQuery: 1,
-	},
-	SortableScoredURL{
-		Url:                "domain 1",
-		Score:              1,
-		OccurrencesInQuery: 1,
-	},
-	SortableScoredURL{
-		Url:                "domain 2",
-		Score:              2,
-		OccurrencesInQuery: 1,
-	},
-}
-
 // func SortURLs(self map[string]ScoredURL) []string {
 
 // }
@@ -89,6 +11,30 @@ var sampleSortableScoredURLs []SortableScoredURL = []SortableScoredURL{
 
 // }
 
-// func CountingSort(self []SortableScoredURL, get func(SortableScoredURL) float64) []SortableScoredURL {
+func CountingSort(self []SortableScoredURL, get func(SortableScoredURL) int64) []SortableScoredURL {
+	var output []SortableScoredURL = make([]SortableScoredURL, len(self))
+	var count []int = make([]int, 10)
 
-// }
+	for i := range count {
+		count[i] = 0
+	}
+
+	for _, i := range self {
+		var index = get(i)
+		count[index] = count[index] + 1
+	}
+
+	for i := range count {
+		if i == 0 {
+			continue
+		}
+		count[i] = count[i-1] + count[i]
+	}
+
+	for _, i := range self {
+		value := get(i)
+		output[count[value]-1] = i
+		count[value] -= 1
+	}
+	return output
+}
