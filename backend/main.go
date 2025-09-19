@@ -59,17 +59,26 @@ func addScoredURLs(self map[string]ScoredURL, other map[string]int64) map[string
 
 func search(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-
-	start := time.Now().UnixNano() / int64(time.Millisecond)
+	w.Header().Set("Vary", "Origin")
+	w.Header().Set("Vary", "Access-Control-Request-Method")
+	w.Header().Set("Vary", "Access-Control-Request-Headers")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Origin, Accept, token")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST,OPTIONS")
 
 	if r.Method == http.MethodOptions {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
 
+	start := time.Now().UnixNano() / int64(time.Millisecond)
+
 	query := r.URL.Query()
+	// rawSearch := query.Get("s")
+
+	// var nonAlphanumericRegex = regexp.MustCompile(`[^a-zA-Z0-9 ]+`)
+
+	// rawSearch = nonAlphanumericRegex.ReplaceAllString(rawSearch, " ")
+
 	search := strings.Split(query.Get("s"), " ")
 
 	if conn == nil {
@@ -121,13 +130,13 @@ func search(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	// err := godotenv.Load()
+	var err error
 
+	// err = godotenv.Load()
 	// if err != nil {
 	// 	fmt.Printf("Error loading dotenv, %s\nexiting", err)
 	// 	return
 	// }
-	var err error
 
 	dbinfo.User = os.Getenv("POSTGRES_DB_USER")
 	dbinfo.Host = os.Getenv("POSTGRES_DB_HOST")
