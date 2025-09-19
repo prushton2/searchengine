@@ -1,9 +1,9 @@
 package main
 
-import "fmt"
+// import "fmt"
 
 func SortURLs(self map[string]ScoredURL) []string {
-	var sortableURLs []SortableScoredURL = make([]SortableScoredURL, len(self))
+	var sortableURLs []SortableScoredURL = make([]SortableScoredURL, 0)
 
 	for key, value := range self {
 		sortableURLs = append(sortableURLs, SortableScoredURL{
@@ -13,16 +13,28 @@ func SortURLs(self map[string]ScoredURL) []string {
 		})
 	}
 
+	if len(sortableURLs) == 0 {
+		return []string{}
+	}
+
+	if len(sortableURLs) == 1 {
+		return []string{sortableURLs[0].Url}
+	}
+
 	// first we sort by score
 	sortableURLs = RadixSort(sortableURLs, func(ssu SortableScoredURL) int64 { return ssu.Score })
 	// then we sort by occurrences in query
 	sortableURLs = RadixSort(sortableURLs, func(ssu SortableScoredURL) int64 { return ssu.OccurrencesInQuery })
 
-	var sortedURLArray []string = []string{}
+	var sortedURLArray []string = make([]string, len(sortableURLs))
 
-	for _, url := range sortableURLs {
-		sortedURLArray = append(sortedURLArray, url.Url)
-		fmt.Printf("%d, %d: %s\n", url.OccurrencesInQuery, url.Score, url.Url)
+	for i, url := range sortableURLs {
+		sortedURLArray[i] = url.Url
+		// fmt.Printf("%d, %d: %s\n", url.OccurrencesInQuery, url.Score, url.Url)
+	}
+
+	for i, j := 0, len(sortedURLArray)-1; i < j; i, j = i+1, j-1 {
+		sortedURLArray[i], sortedURLArray[j] = sortedURLArray[j], sortedURLArray[i]
 	}
 
 	return sortedURLArray
@@ -45,6 +57,9 @@ func RadixSort(self []SortableScoredURL, get func(SortableScoredURL) int64) []So
 	// run the sort the required number of times
 	for exponent <= maximum {
 		sorted = CountingSort(sorted, func(ssu SortableScoredURL) int64 { return (get(ssu) / exponent) % 10 })
+		// for _, url := range sorted {
+		// 	fmt.Printf("%d, %d: %s\n", url.OccurrencesInQuery, url.Score, url.Url)
+		// }
 		exponent *= 10
 	}
 

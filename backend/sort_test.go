@@ -97,7 +97,7 @@ func TestCountingSort(t *testing.T) {
 func TestRadixSort(t *testing.T) {
 	sorted := RadixSort(sampleSortableScoredURLs, func(ssu SortableScoredURL) int64 { return ssu.Score })
 	var last int64 = 0
-
+	// t.Errorf("A")
 	for _, i := range sorted {
 		if i.Score < last {
 			t.Errorf("Radix Sort failed")
@@ -105,17 +105,10 @@ func TestRadixSort(t *testing.T) {
 				t.Errorf("%d, ", j.Score)
 			}
 		}
+
+		if i.Score == 0 {
+			t.Errorf("Unexpected zero")
+		}
 		last = i.Score
 	}
-}
-
-func TestSortURLs(t *testing.T) {
-	var _ = SortURLs(sampledata)
-
-	// var lastScore = 0
-	// var lastOccurrences = 0
-
-	// for _, i := range sorted {
-
-	// }
 }
