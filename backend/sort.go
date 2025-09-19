@@ -2,9 +2,31 @@ package main
 
 import "fmt"
 
-// func SortURLs(self map[string]ScoredURL) []string {
+func SortURLs(self map[string]ScoredURL) []string {
+	var sortableURLs []SortableScoredURL = make([]SortableScoredURL, len(self))
 
-// }
+	for key, value := range self {
+		sortableURLs = append(sortableURLs, SortableScoredURL{
+			Url:                key,
+			Score:              int64(value.Score),
+			OccurrencesInQuery: int64(value.OccurrencesInQuery),
+		})
+	}
+
+	// first we sort by score
+	sortableURLs = RadixSort(sortableURLs, func(ssu SortableScoredURL) int64 { return ssu.Score })
+	// then we sort by occurrences in query
+	sortableURLs = RadixSort(sortableURLs, func(ssu SortableScoredURL) int64 { return ssu.OccurrencesInQuery })
+
+	var sortedURLArray []string = []string{}
+
+	for _, url := range sortableURLs {
+		sortedURLArray = append(sortedURLArray, url.Url)
+		fmt.Printf("%d, %d: %s\n", url.OccurrencesInQuery, url.Score, url.Url)
+	}
+
+	return sortedURLArray
+}
 
 func RadixSort(self []SortableScoredURL, get func(SortableScoredURL) int64) []SortableScoredURL {
 
@@ -16,7 +38,6 @@ func RadixSort(self []SortableScoredURL, get func(SortableScoredURL) int64) []So
 			maximum = get(i)
 		}
 	}
-	fmt.Printf("maximum: %d\n", maximum)
 
 	// for each digit from lowest power of 10 to largest power of 10, update sorted
 	var sorted []SortableScoredURL = self

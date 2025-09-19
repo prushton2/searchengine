@@ -108,3 +108,14 @@ func TestRadixSort(t *testing.T) {
 		last = i.Score
 	}
 }
+
+func TestSortURLs(t *testing.T) {
+	var _ = SortURLs(sampledata)
+
+	// var lastScore = 0
+	// var lastOccurrences = 0
+
+	// for _, i := range sorted {
+
+	// }
+}
