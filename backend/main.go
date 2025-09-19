@@ -127,7 +127,7 @@ func search(w http.ResponseWriter, r *http.Request) {
 func main() {
 	// fmt.Printf("%v\n", sortURLs(sampledata))
 
-	return
+	// return
 
 	err := godotenv.Load()
 
