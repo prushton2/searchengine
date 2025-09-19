@@ -19,26 +19,24 @@ const Index = () => {
     setHasSearched(true);
     
     try {
-      const scoredurls = await APISearch(query);
-
-      let sortedScoredURLs = Object.entries(scoredurls.words).sort((a, b) => b[1] - a[1])
+      const searchResult = await APISearch(query);
 
       let results: SearchResultType[] = []
       
-      sortedScoredURLs.forEach((e, i) => {
-        let metadata: sitemetadata = scoredurls.metadata[e[0]];
+      searchResult.url.forEach((e, i) => {
+        let metadata: sitemetadata = searchResult.metadata[e];
       
         results.push({
           id: `${i}`,
           title: metadata.title,
           description: metadata.description,
-          url: e[0],
-          domain: e[0]
+          url: e,
+          domain: e
         })
       })
 
       setSearchResults(results);
-      setSearchTime(scoredurls.elapsedtime / 1000);
+      setSearchTime(searchResult.elapsedtime / 1000);
       
       toast({
         title: "Search completed",

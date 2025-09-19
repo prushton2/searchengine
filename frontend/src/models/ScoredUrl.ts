@@ -1,5 +1,5 @@
 export interface ScoredUrls {
-    words: Map<string, number>
+    url: string[]
     metadata: Map<string, sitemetadata>
     elapsedtime: number
 }
