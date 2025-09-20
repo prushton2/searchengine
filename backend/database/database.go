@@ -49,6 +49,10 @@ func Get_words(db *sql.DB, word string) (map[string]int64, error) {
 }
 
 func Get_site_metadata(db *sql.DB, query_urls []string) (map[string]SiteMetadata, error) {
+	if len(query_urls) == 0 {
+		return make(map[string]SiteMetadata), nil
+	}
+
 	var query = fmt.Sprintf("SELECT * FROM sitemetadata WHERE url IN ('%s');", strings.Join(query_urls, "', '"))
 	// fmt.Printf("q: %s\n", query)
 	rows, err := db.Query(query)

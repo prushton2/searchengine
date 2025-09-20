@@ -40,24 +40,6 @@ export const SearchBar = ({ onSearch, isLoading, className }: SearchBarProps) =>
             className="flex-1 border-0 bg-transparent pl-12 pr-20 py-4 text-base placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0"
             disabled={isLoading}
           />
-          <div className="absolute right-2 flex items-center gap-1">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 p-0 hover:bg-accent rounded-full"
-            >
-              <Mic className="h-4 w-4" />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 p-0 hover:bg-accent rounded-full"
-            >
-              <Camera className="h-4 w-4" />
-            </Button>
-          </div>
         </div>
       </form>
       

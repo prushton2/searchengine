@@ -28,7 +28,7 @@ export const SearchResults = ({ results, isLoading, searchTime, totalResults }: 
       {/* Search Stats */}
       <div className="text-sm text-muted-foreground border-b border-border pb-4">
         {totalResults && (
-          <span>About {totalResults.toLocaleString()} results</span>
+          <span>Showing 0-50 of about {totalResults.toLocaleString()} results</span>
         )}
         {searchTime && (
           <span className="ml-2">({searchTime.toFixed(2)} seconds)</span>

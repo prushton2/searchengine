@@ -1,7 +1,8 @@
 export interface ScoredUrls {
     url: string[]
     metadata: Map<string, sitemetadata>
-    elapsedtime: number
+    elapsedtime: number,
+    totalResults: number
 }
 
 export interface sitemetadata {

@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"os"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,9 +17,10 @@ import (
 )
 
 type HTTPResponse struct {
-	Urls        []string                         `json:"url"`
-	Metadata    map[string]database.SiteMetadata `json:"metadata"`
-	ElapsedTime int64                            `json:"elapsedtime"`
+	Urls         []string                         `json:"url"`
+	Metadata     map[string]database.SiteMetadata `json:"metadata"`
+	ElapsedTime  int64                            `json:"elapsedtime"`
+	TotalResults int64                            `json:"totalResults"`
 }
 
 type ScoredURL struct {
@@ -73,13 +77,15 @@ func search(w http.ResponseWriter, r *http.Request) {
 	start := time.Now().UnixNano() / int64(time.Millisecond)
 
 	query := r.URL.Query()
-	// rawSearch := query.Get("s")
+	rawSearch := query.Get("s")
+	var nonAlphanumericRegex = regexp.MustCompile(`[^a-zA-Z0-9 ]+`)
+	rawSearch = nonAlphanumericRegex.ReplaceAllString(rawSearch, " ")
+	search := strings.Split(rawSearch, " ")
 
-	// var nonAlphanumericRegex = regexp.MustCompile(`[^a-zA-Z0-9 ]+`)
-
-	// rawSearch = nonAlphanumericRegex.ReplaceAllString(rawSearch, " ")
-
-	search := strings.Split(query.Get("s"), " ")
+	pageNo, err := strconv.ParseInt(query.Get("p"), 10, 64)
+	if err != nil {
+		pageNo = 1
+	}
 
 	if conn == nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -103,7 +109,13 @@ func search(w http.ResponseWriter, r *http.Request) {
 	// Sort the urls by score
 	SortedURLs := SortURLs(Scores)
 
-	metadata, err := database.Get_site_metadata(conn, SortedURLs)
+	// 50 is the page size, we are clamping the upper cap inside the size of the array and making sure lowercap is 50 less than uppercap or 0
+	upperCap := int64(math.Min(float64(pageNo*50), float64(len(SortedURLs))))
+	lowerCap := int64(math.Max(float64(upperCap-50), 0.0))
+
+	TrimmedURLs := SortedURLs[lowerCap:upperCap]
+
+	metadata, err := database.Get_site_metadata(conn, TrimmedURLs)
 
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -114,9 +126,10 @@ func search(w http.ResponseWriter, r *http.Request) {
 	end := time.Now().UnixNano() / int64(time.Millisecond)
 
 	var response HTTPResponse = HTTPResponse{
-		Urls:        SortedURLs,
-		Metadata:    metadata,
-		ElapsedTime: end - start,
+		Urls:         TrimmedURLs,
+		Metadata:     metadata,
+		ElapsedTime:  end - start,
+		TotalResults: int64(len(SortedURLs)),
 	}
 
 	v, err := json.Marshal(response)

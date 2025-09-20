@@ -9,6 +9,7 @@ import { sitemetadata } from "@/models/ScoredUrl";
 
 const Index = () => {
   const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [totalResults, setTotalResults] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [searchTime, setSearchTime] = useState<number>();
@@ -36,11 +37,12 @@ const Index = () => {
       })
 
       setSearchResults(results);
+      setTotalResults(searchResult.totalResults);
       setSearchTime(searchResult.elapsedtime / 1000);
       
       toast({
         title: "Search completed",
-        description: `Found ${results.length} results for "${query}"`,
+        description: `Found ${searchResult.totalResults} results for "${query}"`,
       });
     } catch (error) {
       toast({
@@ -94,7 +96,7 @@ const Index = () => {
               isLoading={isLoading}
               results={searchResults}
               searchTime={searchTime}
-              totalResults={searchResults.length}
+              totalResults={totalResults}
             />
           </div>
         </div>
