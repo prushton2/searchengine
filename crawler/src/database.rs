@@ -119,6 +119,17 @@ impl Database {
         };
     }
 
+    pub fn urlqueue_count(self: &mut Self) -> i32 {
+        let row = match self.client.query_one(
+            "SELECT COUNT(*) FROM urlqueue",
+            &[]
+        ) {
+            Ok(t) => t,
+            Err(_) => return 0
+        };
+        return row.get::<&str, i32>("count")
+    }
+
     pub fn urlqueue_get_front(self: &mut Self, pop: bool) -> Option<(String, u8)> {
         let row = match self.client.query_one(
             "SELECT * FROM urlqueue WHERE priority = 0 LIMIT 1",

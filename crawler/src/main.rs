@@ -27,17 +27,15 @@ fn main() {
     };
 
     // ensure there is a starter url
-    match db.urlqueue_get_front(false) {
-        Some(_) => {}, // not empty!
-        None => { // empty, add a starting url
-            let _ = db.urlqueue_push("https://example.com", 0, 0);
-        }
-    };
+    if db.urlqueue_count() == 0 {
+        // empty, add starting url
+        let _ = db.urlqueue_push("https://example.com", 0, 0);
+    }
 
-    crawler_thread(&mut db, max_crawl_depth);
+    crawler_thread(&mut db, max_crawl_depth, 1);
 }
 
-fn crawler_thread(db: &mut database::Database, max_crawl_depth: u8) {
+fn crawler_thread(db: &mut database::Database, max_crawl_depth: u8, crawler_id: u8) {
     loop {
         // get the url object from queue and do some preprocessing
         let raw_url_object: (String, u8) = match db.urlqueue_get_front(true) {
