@@ -111,7 +111,7 @@ func search(w http.ResponseWriter, r *http.Request) {
 
 	// 50 is the page size, we are clamping the upper cap inside the size of the array and making sure lowercap is 50 less than uppercap or 0
 	upperCap := int64(math.Min(float64(pageNo*50), float64(len(SortedURLs))))
-	lowerCap := int64(math.Max(float64(upperCap-50), 0.0))
+	lowerCap := int64(math.Max(float64((pageNo-1)*50), 0.0))
 
 	TrimmedURLs := SortedURLs[lowerCap:upperCap]
 
