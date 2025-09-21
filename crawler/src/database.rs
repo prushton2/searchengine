@@ -52,7 +52,7 @@ impl Database {
             CREATE TABLE IF NOT EXISTS URLQueue (
                 url varchar(512) PRIMARY KEY,
                 depth integer,
-                priority integer
+                crawler_id integer
             );
 
             CREATE TABLE IF NOT EXISTS CrawledURLs (
@@ -130,14 +130,16 @@ impl Database {
         return row.get::<&str, i32>("count")
     }
 
-    pub fn urlqueue_get_front(self: &mut Self, pop: bool) -> Option<(String, u8)> {
+    pub fn urlqueue_pop_front(self: &mut Self, crawler_id: i32) -> Option<(String, u8)> {
+        // get a url owned by the callee
         let row = match self.client.query_one(
-            "SELECT * FROM urlqueue WHERE priority = 0 LIMIT 1",
-            &[]
+            "SELECT * FROM urlqueue WHERE crawler_id=$1 LIMIT 1",
+            &[&crawler_id]
         ) {
             Ok(t) => t,
+            // if fails, get an unowned url
             Err(_) => match self.client.query_one(
-                "SELECT * FROM urlqueue WHERE priority = 1 LIMIT 1",
+                "SELECT * FROM urlqueue WHERE crawler_id=0 LIMIT 1",
                 &[]
             ) {
                 Ok(t) => t,
@@ -150,20 +152,18 @@ impl Database {
             row.get::<&str, i32>("depth") as u8
         );
 
-        if pop {
-            let _ = self.client.execute(
-                "DELETE FROM urlqueue WHERE url = $1",
-                &[&data.0]
-            );
-        }
+        let _ = self.client.execute(
+            "DELETE FROM urlqueue WHERE url = $1",
+            &[&data.0]
+        );
 
         return Some(data)
     }
 
-    pub fn urlqueue_push(self: &mut Self, url: &str, depth: u8, priority: u8) -> Result<String, String> {
+    pub fn urlqueue_push(self: &mut Self, url: &str, depth: u8, crawler_id: i32) -> Result<String, String> {
         match self.client.execute(
             "INSERT INTO urlqueue VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
-            &[&url, &(depth as i32), &(priority as i32)]
+            &[&url, &(depth as i32), &crawler_id]
         ) {
             Ok(_) => return Ok("Success".to_string()),
             Err(t) => return Err(format!("Error running urlqueue_push: {}", t))
