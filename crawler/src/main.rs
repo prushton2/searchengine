@@ -8,9 +8,9 @@ mod crawled_page;
 mod page_content;
 mod database;
 
-const MAX_CRAWL_DEPTH: u8 = 5;
 
 fn main() {
+    let max_crawl_depth: u8 = dotenv::var("MAX_CRAWL_DEPTH").unwrap().parse().expect("Invalid crawl depth, must be an unsigned 8 bit integer");
 
     let dbinfo = database::DBInfo{
         host: dotenv::var("POSTGRES_DB_HOST").unwrap(),
@@ -34,13 +34,11 @@ fn main() {
         }
     };
 
-    crawler_thread(&mut db);
+    crawler_thread(&mut db, max_crawl_depth);
 }
 
-fn crawler_thread(db: &mut database::Database) {
+fn crawler_thread(db: &mut database::Database, max_crawl_depth: u8) {
     loop {
-        // let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH);
-        
         // get the url object from queue and do some preprocessing
         let raw_url_object: (String, u8) = match db.urlqueue_get_front(true) {
             Some(t) => t,
@@ -55,7 +53,10 @@ fn crawler_thread(db: &mut database::Database) {
         let url_string: &str = url_object.as_str();
         let depth = raw_url_object.1;
 
-        
+        if depth > max_crawl_depth {
+            continue;
+        }
+
         drop(raw_url_object);
         
         // dont redo a url within a week
@@ -116,18 +117,15 @@ fn crawler_thread(db: &mut database::Database) {
 
             if crawled_url_host == url_object.domain().unwrap() {
                 // has to be nested since we dont want depth above max being put on the queue
-                if depth + 1 <= MAX_CRAWL_DEPTH { 
-                    // urlqueue.push_front((crawled_url.as_str().to_string(), depth + 1));
+                if depth + 1 <= max_crawl_depth { 
                     let _ = db.urlqueue_push(crawled_url.as_str(), depth+1, 0);
                 }
             } else {
                 let _ = db.urlqueue_push(convert_url_to_domain(&crawled_url).as_str(), 0, 1);
-                // urlqueue.push_back((convert_url_to_domain(&crawled_url).to_string(), 0));
             }
         }
         
         //add to usedurls
-        // usedurls.insert(url_string.to_string(), now.expect("").as_secs() + 7 * 86400);
         let _ = db.crawledurls_add(url_string);
         
         //convert pagecontent to crawled url
@@ -164,7 +162,6 @@ fn reqwest_url(url: &str) -> Result<Vec<u8>, String> {
         Ok(t) => t,
         Err(_) => return Err("Could not get URL".to_string())
     };
-
 
     if result.status().is_redirection() {
         let redirect_to = match result.headers().get("location") {
