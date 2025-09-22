@@ -3,6 +3,7 @@ use std::thread::sleep;
 use dotenv;
 
 use url::Url;
+use robotstxt::DefaultMatcher;
 
 mod crawled_page;
 mod page_content;
@@ -36,6 +37,10 @@ fn main() {
 }
 
 fn crawler_thread(db: &mut database::Database, max_crawl_depth: u8, crawler_id: i32) {
+    let mut previous_domain: &str = "";
+    let mut robotstxt: &str = "";
+    let mut matcher = DefaultMatcher::default();
+
     loop {
         // get the url object from queue and do some preprocessing
         let raw_url_object: (String, u8) = match db.urlqueue_pop_front(crawler_id) {
@@ -50,14 +55,35 @@ fn crawler_thread(db: &mut database::Database, max_crawl_depth: u8, crawler_id: 
 
         let url_string: &str = url_object.as_str();
         let depth = raw_url_object.1;
-
+        drop(raw_url_object);
+        
         if depth > max_crawl_depth {
             continue;
         }
 
-        drop(raw_url_object);
-        
-        // dont redo a url within a week
+        // if the url changed, we need to refetch robots.txt
+        if url_object.host_str() != Some(previous_domain) {
+
+            let mut robots_path = url_object.clone();
+            robots_path.set_path("/robots.txt");
+            robots_path.set_query(None);
+            robots_path.set_fragment(None);
+            
+            robotstxt = match reqwest_url(robots_path.as_str()) {
+                Ok(t) => match str::from_utf8(t) {
+                    Ok(t) => t,
+                    Err(t) => "user-agent: *\ndisallow:"
+                }
+                Err(t) => "user-agent: *\ndisallow:"
+            }
+            
+            previous_domain = url_object.host_str()
+        }
+
+        // check if we are allowed to crawl here
+        // if matcher.one_agent_allowed_by_robots()
+
+        // dont redo a url within the defined timeframe
         match db.crawledurls_status(url_string).unwrap() {
             database::UsedUrlStatus::CannotCrawlUrl => {continue;}
             _ => {}
@@ -125,16 +151,16 @@ fn crawler_thread(db: &mut database::Database, max_crawl_depth: u8, crawler_id: 
             }
         }
         
-        //add to usedurls
+        // add the url to the list of crawled urls
         let _ = db.crawledurls_add(url_string);
         
-        //convert pagecontent to crawled url
+        // convert pagecontent to crawled url
         let crawled_page = crawled_page::CrawledPage::from_page_content(&pagecontent, url_string).unwrap();
         
-        //write crawledurl to disk
+        // write crawledurl to disk
         db.write_crawled_page(&crawled_page);
         
-        //one page a second only on successful scrapes (good? idk)
+        // one page every 5 seconds only on successful scrapes (good? idk?)
         sleep(Duration::new(5, 0));
     }
 }
@@ -154,7 +180,7 @@ fn convert_url_to_domain(url: &url::Url) -> url::Url {
 
 fn reqwest_url(url: &str) -> Result<Vec<u8>, String> {
     let client = reqwest::blocking::Client::builder()
-        .user_agent("Mozilla/5.0 (X11; Linux x86_64; rv:142.0) Gecko/20100101 Firefox/142.0")
+        .user_agent("search.prushton.com/1.0 (https://github.com/prushton2/searchengine)")
         .build()
         .unwrap();
     
