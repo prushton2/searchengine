@@ -27,20 +27,18 @@ fn main() {
     };
 
     // ensure there is a starter url
-    match db.urlqueue_get_front(false) {
-        Some(_) => {}, // not empty!
-        None => { // empty, add a starting url
-            let _ = db.urlqueue_push("https://example.com", 0, 0);
-        }
-    };
+    if db.urlqueue_count() == 0 {
+        // empty, add starting url
+        let _ = db.urlqueue_push("https://example.com", 0, 0);
+    }
 
-    crawler_thread(&mut db, max_crawl_depth);
+    crawler_thread(&mut db, max_crawl_depth, 1);
 }
 
-fn crawler_thread(db: &mut database::Database, max_crawl_depth: u8) {
+fn crawler_thread(db: &mut database::Database, max_crawl_depth: u8, crawler_id: i32) {
     loop {
         // get the url object from queue and do some preprocessing
-        let raw_url_object: (String, u8) = match db.urlqueue_get_front(true) {
+        let raw_url_object: (String, u8) = match db.urlqueue_pop_front(crawler_id) {
             Some(t) => t,
             None => {println!("Crawler ran out of urls"); break}
         };
@@ -117,11 +115,13 @@ fn crawler_thread(db: &mut database::Database, max_crawl_depth: u8) {
 
             if crawled_url_host == url_object.domain().unwrap() {
                 // has to be nested since we dont want depth above max being put on the queue
-                if depth + 1 <= max_crawl_depth { 
-                    let _ = db.urlqueue_push(crawled_url.as_str(), depth+1, 0);
+                if depth + 1 <= max_crawl_depth {
+                    // add the url to the queue, and set the id of the crawler responsible for it
+                    let _ = db.urlqueue_push(crawled_url.as_str(), depth+1, crawler_id);
                 }
             } else {
-                let _ = db.urlqueue_push(convert_url_to_domain(&crawled_url).as_str(), 0, 1);
+                // if the domain is different, just add the domain unowned by any crawler
+                let _ = db.urlqueue_push(convert_url_to_domain(&crawled_url).as_str(), 0, 0);
             }
         }
         
