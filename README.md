@@ -6,40 +6,58 @@ A search engine built in Rust, Go, and React. This is purely a project for learn
 POSTGRES_DB_USER=user
 POSTGRES_DB_PASSWORD=password
 POSTGRES_DB_DATABASE=maindb
-POSTGRES_DB_HOST=localhost
+POSTGRES_DB_HOST=db
 MAX_CRAWL_DEPTH=5
+VITE_BACKEND_URL=http://localhost:3333
+FRONTEND_PORT=8080
+BACKEND_PORT=3333
 ```
 
 # Crawler
-The responsibility of the crawler is to find text and urls in a page. I use a queue with a depth limit of 4 to crawl pages, and i store the crawled page in a file named `timestamp.json`
+The responsibility of the crawler is to find text and urls in a page. I use a queue with a depth limit of 3 to crawl pages, and i store the postgres db
 
 ## Issues
-* Curl does not resolve 300 response codes, leading to pages that can only be searched with "Permanently Moved"
-* Curl does not scrape pages with JS rendering
-* FIXED: Currently, the crawler will only search a maximum depth of 4 into a website before entering another url. This doesnt work well, as any change in the url resets the depth
-* NON ISSUE: The crawler is bad at filtering words. It will concatenate words in adjacent HTML elements, and cannot distinguish hex codes
-* DONE: It should store site specific data (title, description, etc..)
+## Not started
+* The crawler is bad at filtering words. It will concatenate words in adjacent HTML elements, and cannot distinguish hex codes
+    * Ideally use a real tokenizer
+* Create multiple crawlers each with a thread
+    * count defined in .env
+* Reqwest does not scrape pages with JS rendering
+* Reqwest 3XX Codes
+    * Should return the dereferenced url and use that url for indexing
+### In Progress
+* Needs to respect robots.txt
+    * Doesnt read the crawl delay (if any)
+### Resolved
+* Reqwest does not resolve 300 response codes, leading to pages that can only be searched with "Permanently Moved"
+    * Recursively dereferences 3XX codes
+* Currently, the crawler will only search a maximum depth of 4 into a website before entering another url. This doesnt work well, as any change in the url resets the depth
+* It should store site specific data (title, description, etc..)
 
 # Indexer
-The indexer takes crawled data and sorts it by word. A word must be 2 characters long, and is stored in `./word[0..2]/word.json`. The file contains URLs and their score with the indexer.
+The indexer takes crawled data and sorts it by word. 
 
 ## Issues
-* It is abysmally slow. I suspect this to be the many files written in quick succession, but i have yet to benchmark it
-* Fix some security issues by stripping characters
+### In Progress
+* It is pretty slow. I suspect this to be the many non batched postgres queries, but i have yet to benchmark it
+### Resolved
 * This should use a real database
 * Strip non important words
-* DONE: The indexer is bad at character lengths, since characters arent well defined in unicode
+* The indexer is bad at character lengths, since characters arent well defined in unicode
 
 # Backend
 The backend gets a search request and compiles the requested sites for the frontend
 
-# Issues
-* ISSUE GIVEN TO FRONTEND: It doesnt return sorted data
+## Issues
+### In Progress
+### Resolved
+* It doesnt return sorted data
+* Ranking should look for word occurrences in webpage
 
 # Frontend
 The website to show the user their search query
 
-# Issues
+## Issues
 * NON ISSUE: It looks horrible
 
 

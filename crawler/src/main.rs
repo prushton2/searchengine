@@ -64,7 +64,7 @@ fn crawler_thread(db: &mut database::Database, max_crawl_depth: u8, crawler_id: 
             continue;
         }
 
-        // // if the url changed, we need to refetch robots.txt
+        // if the url changed, we need to refetch robots.txt
         if url_object.domain() != Some(previous_domain.as_str()) {
             
             let mut robots_path = url_object.clone();
@@ -150,7 +150,7 @@ fn crawler_thread(db: &mut database::Database, max_crawl_depth: u8, crawler_id: 
             if crawled_url_host == url_object.domain().unwrap() {
                 // has to be nested since we dont want depth above max being put on the queue
                 if depth + 1 <= max_crawl_depth {
-                    // add the url to the queue, and set the id of the crawler responsible for it
+                    // add the url to the queue, and set the id of the crawler responsible for it. One crawler crawl one webpage, this makes it easier to respect the crawl_delay
                     let _ = db.urlqueue_push(crawled_url.as_str(), depth+1, crawler_id);
                 }
             } else {
