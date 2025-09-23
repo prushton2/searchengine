@@ -82,7 +82,7 @@ fn crawler_thread(db: &mut database::Database, max_crawl_depth: u8, crawler_id: 
                 Err(_) => "user-agent: *\ndisallow:".into(),
             };
 
-            println!("New robots host domain: {}", robots_path.domain().expect("Bad url_object host"));
+            println!("New robots.txt file fetched from {} for crawler id {}", robots_path.domain().expect("Bad url_object host"), crawler_id);
             previous_domain = robots_path.domain().expect("Bad url_object host").to_string();
         }
 
@@ -106,10 +106,10 @@ fn crawler_thread(db: &mut database::Database, max_crawl_depth: u8, crawler_id: 
         };
         let bytes_slice = response.0.as_slice();
 
-        let dereferenced_url_object = match Url::parse(response.1) {
+        let dereferenced_url_object = match Url::parse(&response.1) {
             Ok(t) => t,
-            Err(t) { println!("Somehow the redirect url {} was valid enough to fetch, but isnt valid enough for the Url crate", response.1); continue;}
-        }
+            Err(_) => { println!("Somehow the redirect url {} was valid enough to fetch, but isnt valid enough for the Url crate", response.1); continue;}
+        };
 
         // convert bytes to page content
         let pagecontent = match page_content::PageContent::from_html(&bytes_slice) {
