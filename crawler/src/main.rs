@@ -1,5 +1,6 @@
 use std::time::{Duration};
 use std::thread::sleep;
+use std::str;
 use dotenv;
 
 use url::Url;
@@ -9,6 +10,7 @@ mod crawled_page;
 mod page_content;
 mod database;
 
+static USER_AGENT: &str = "search.prushton.com/1.0 (https://github.com/prushton2/searchengine)";
 
 fn main() {
     let max_crawl_depth: u8 = dotenv::var("MAX_CRAWL_DEPTH").unwrap().parse().expect("Invalid crawl depth, must be an unsigned 8 bit integer");
@@ -37,7 +39,7 @@ fn main() {
 }
 
 fn crawler_thread(db: &mut database::Database, max_crawl_depth: u8, crawler_id: i32) {
-    let mut previous_domain: &str = "";
+    let mut previous_domain: String = String::from("");
     let mut robotstxt: &str = "";
     let mut matcher = DefaultMatcher::default();
 
@@ -62,26 +64,31 @@ fn crawler_thread(db: &mut database::Database, max_crawl_depth: u8, crawler_id: 
         }
 
         // if the url changed, we need to refetch robots.txt
-        if url_object.host_str() != Some(previous_domain) {
+        if url_object.domain() != Some(&previous_domain) {
 
             let mut robots_path = url_object.clone();
             robots_path.set_path("/robots.txt");
             robots_path.set_query(None);
             robots_path.set_fragment(None);
             
-            robotstxt = match reqwest_url(robots_path.as_str()) {
-                Ok(t) => match str::from_utf8(t) {
-                    Ok(t) => t,
-                    Err(t) => "user-agent: *\ndisallow:"
-                }
-                Err(t) => "user-agent: *\ndisallow:"
-            }
+            let robots_bytes: Vec<u8> = match reqwest_url(robots_path.as_str()) {
+                Ok(t) => t,
+                Err(_) => "user-agent: *\ndisallow:".as_bytes().to_owned()
+            };
             
-            previous_domain = url_object.host_str()
+            robotstxt = match str::from_utf8(&robots_bytes.as_slice()) {
+                Ok(t) => t,
+                Err(_) => "user-agent: *\ndisallow:".into()
+            };
+
+            println!("New robots host domain: {}", robots_path.domain().expect("Bad url_object host"));
+            previous_domain = robots_path.domain().expect("Bad url_object host").to_string();
         }
 
         // check if we are allowed to crawl here
-        // if matcher.one_agent_allowed_by_robots()
+        if !matcher.one_agent_allowed_by_robots(robotstxt, USER_AGENT, url_string) {
+            continue
+        }
 
         // dont redo a url within the defined timeframe
         match db.crawledurls_status(url_string).unwrap() {
@@ -180,7 +187,7 @@ fn convert_url_to_domain(url: &url::Url) -> url::Url {
 
 fn reqwest_url(url: &str) -> Result<Vec<u8>, String> {
     let client = reqwest::blocking::Client::builder()
-        .user_agent("search.prushton.com/1.0 (https://github.com/prushton2/searchengine)")
+        .user_agent(USER_AGENT)
         .build()
         .unwrap();
     
