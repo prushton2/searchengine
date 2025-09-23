@@ -73,7 +73,7 @@ fn crawler_thread(db: &mut database::Database, max_crawl_depth: u8, crawler_id: 
             robots_path.set_fragment(None);
             
             let robots_bytes: Vec<u8> = match reqwest_url(robots_path.as_str()) {
-                Ok(t) => t,
+                Ok(t) => t.0,
                 Err(_) => "user-agent: *\ndisallow:".as_bytes().to_owned()
             };
             
@@ -100,11 +100,16 @@ fn crawler_thread(db: &mut database::Database, max_crawl_depth: u8, crawler_id: 
         println!("{}: {}", depth, url_string);
         
         // fetch url as bytes
-        let bytes_vec = match reqwest_url(&url_string) {
+        let response: (Vec<u8>, String) = match reqwest_url(&url_string) {
             Ok(t) => t,
             Err(t) => { println!("Failed to get {}: {}, skipping", &url_string, t); continue; }
         };
-        let bytes_slice = bytes_vec.as_slice();
+        let bytes_slice = response.0.as_slice();
+
+        let dereferenced_url_object = match Url::parse(response.1) {
+            Ok(t) => t,
+            Err(t) { println!("Somehow the redirect url {} was valid enough to fetch, but isnt valid enough for the Url crate", response.1); continue;}
+        }
 
         // convert bytes to page content
         let pagecontent = match page_content::PageContent::from_html(&bytes_slice) {
@@ -123,7 +128,7 @@ fn crawler_thread(db: &mut database::Database, max_crawl_depth: u8, crawler_id: 
                     t
                 },
                 Err(_t) => {
-                    match url_object.join(raw_crawled_url) {
+                    match dereferenced_url_object.join(raw_crawled_url) {
                         Ok(mut t) => {
                             filter_url(&mut t);
                             t
@@ -147,7 +152,7 @@ fn crawler_thread(db: &mut database::Database, max_crawl_depth: u8, crawler_id: 
                 None => continue
             };
 
-            if crawled_url_host == url_object.domain().unwrap() {
+            if crawled_url_host == dereferenced_url_object.domain().unwrap() {
                 // has to be nested since we dont want depth above max being put on the queue
                 if depth + 1 <= max_crawl_depth {
                     // add the url to the queue, and set the id of the crawler responsible for it. One crawler crawl one webpage, this makes it easier to respect the crawl_delay
@@ -160,7 +165,7 @@ fn crawler_thread(db: &mut database::Database, max_crawl_depth: u8, crawler_id: 
         }
         
         // add the url to the list of crawled urls
-        let _ = db.crawledurls_add(url_string);
+        let _ = db.crawledurls_add(dereferenced_url_object.as_str());
         
         // convert pagecontent to crawled url
         let crawled_page = crawled_page::CrawledPage::from_page_content(&pagecontent, url_string).unwrap();
@@ -186,7 +191,7 @@ fn convert_url_to_domain(url: &url::Url) -> url::Url {
     return converted_url;
 }
 
-fn reqwest_url(url: &str) -> Result<Vec<u8>, String> {
+fn reqwest_url(url: &str) -> Result<(Vec<u8>, String), String> {
     let client = reqwest::blocking::Client::builder()
         .user_agent(USER_AGENT)
         .build()
@@ -228,5 +233,6 @@ fn reqwest_url(url: &str) -> Result<Vec<u8>, String> {
         Err(_) => return Err("Could not get bytes".to_string())
     };
 
-    return Ok(bytes.to_vec())
+    // returning the url lets us know what the actual url is when dereferencing 3XX Urls
+    return Ok((bytes.to_vec(), url.to_owned()))
 }
