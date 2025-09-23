@@ -40,10 +40,11 @@ fn main() {
 
 fn crawler_thread(db: &mut database::Database, max_crawl_depth: u8, crawler_id: i32) {
     let mut previous_domain: String = String::from("");
-    let mut robotstxt: &str = "";
-    let mut matcher = DefaultMatcher::default();
-
+    let mut robotstxt: String = String::from("");
+    
     loop {
+        let mut matcher = DefaultMatcher::default();
+
         // get the url object from queue and do some preprocessing
         let raw_url_object: (String, u8) = match db.urlqueue_pop_front(crawler_id) {
             Some(t) => t,
@@ -63,9 +64,9 @@ fn crawler_thread(db: &mut database::Database, max_crawl_depth: u8, crawler_id: 
             continue;
         }
 
-        // if the url changed, we need to refetch robots.txt
-        if url_object.domain() != Some(&previous_domain) {
-
+        // // if the url changed, we need to refetch robots.txt
+        if url_object.domain() != Some(previous_domain.as_str()) {
+            
             let mut robots_path = url_object.clone();
             robots_path.set_path("/robots.txt");
             robots_path.set_query(None);
@@ -76,9 +77,9 @@ fn crawler_thread(db: &mut database::Database, max_crawl_depth: u8, crawler_id: 
                 Err(_) => "user-agent: *\ndisallow:".as_bytes().to_owned()
             };
             
-            robotstxt = match str::from_utf8(&robots_bytes.as_slice()) {
-                Ok(t) => t,
-                Err(_) => "user-agent: *\ndisallow:".into()
+            robotstxt = match str::from_utf8(&robots_bytes) {
+                Ok(t) => t.to_string(),
+                Err(_) => "user-agent: *\ndisallow:".into(),
             };
 
             println!("New robots host domain: {}", robots_path.domain().expect("Bad url_object host"));
@@ -86,7 +87,7 @@ fn crawler_thread(db: &mut database::Database, max_crawl_depth: u8, crawler_id: 
         }
 
         // check if we are allowed to crawl here
-        if !matcher.one_agent_allowed_by_robots(robotstxt, USER_AGENT, url_string) {
+        if !matcher.one_agent_allowed_by_robots(&robotstxt, USER_AGENT, &url_string) {
             continue
         }
 
