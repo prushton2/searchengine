@@ -1,13 +1,16 @@
 use std::time::{Duration};
 use std::thread::sleep;
+use std::str;
 use dotenv;
 
 use url::Url;
+use robotstxt::DefaultMatcher;
 
 mod crawled_page;
 mod page_content;
 mod database;
 
+static USER_AGENT: &str = "search.prushton.com/1.0 (https://github.com/prushton2/searchengine)";
 
 fn main() {
     let max_crawl_depth: u8 = dotenv::var("MAX_CRAWL_DEPTH").unwrap().parse().expect("Invalid crawl depth, must be an unsigned 8 bit integer");
@@ -36,7 +39,12 @@ fn main() {
 }
 
 fn crawler_thread(db: &mut database::Database, max_crawl_depth: u8, crawler_id: i32) {
+    let mut previous_domain: String = String::from("");
+    let mut robotstxt: String = String::from("");
+    
     loop {
+        let mut matcher = DefaultMatcher::default();
+
         // get the url object from queue and do some preprocessing
         let raw_url_object: (String, u8) = match db.urlqueue_pop_front(crawler_id) {
             Some(t) => t,
@@ -50,14 +58,40 @@ fn crawler_thread(db: &mut database::Database, max_crawl_depth: u8, crawler_id: 
 
         let url_string: &str = url_object.as_str();
         let depth = raw_url_object.1;
-
+        drop(raw_url_object);
+        
         if depth > max_crawl_depth {
             continue;
         }
 
-        drop(raw_url_object);
-        
-        // dont redo a url within a week
+        // if the url changed, we need to refetch robots.txt
+        if url_object.domain() != Some(previous_domain.as_str()) {
+            
+            let mut robots_path = url_object.clone();
+            robots_path.set_path("/robots.txt");
+            robots_path.set_query(None);
+            robots_path.set_fragment(None);
+            
+            let robots_bytes: Vec<u8> = match reqwest_url(robots_path.as_str()) {
+                Ok(t) => t.0,
+                Err(_) => "user-agent: *\ndisallow:".as_bytes().to_owned()
+            };
+            
+            robotstxt = match str::from_utf8(&robots_bytes) {
+                Ok(t) => t.to_string(),
+                Err(_) => "user-agent: *\ndisallow:".into(),
+            };
+
+            println!("New robots.txt file fetched from {} for crawler id {}", robots_path.domain().expect("Bad url_object host"), crawler_id);
+            previous_domain = robots_path.domain().expect("Bad url_object host").to_string();
+        }
+
+        // check if we are allowed to crawl here
+        if !matcher.one_agent_allowed_by_robots(&robotstxt, USER_AGENT, &url_string) {
+            continue
+        }
+
+        // dont redo a url within the defined timeframe
         match db.crawledurls_status(url_string).unwrap() {
             database::UsedUrlStatus::CannotCrawlUrl => {continue;}
             _ => {}
@@ -66,11 +100,16 @@ fn crawler_thread(db: &mut database::Database, max_crawl_depth: u8, crawler_id: 
         println!("{}: {}", depth, url_string);
         
         // fetch url as bytes
-        let bytes_vec = match reqwest_url(&url_string) {
+        let response: (Vec<u8>, String) = match reqwest_url(&url_string) {
             Ok(t) => t,
             Err(t) => { println!("Failed to get {}: {}, skipping", &url_string, t); continue; }
         };
-        let bytes_slice = bytes_vec.as_slice();
+        let bytes_slice = response.0.as_slice();
+
+        let dereferenced_url_object = match Url::parse(&response.1) {
+            Ok(t) => t,
+            Err(_) => { println!("Somehow the redirect url {} was valid enough to fetch, but isnt valid enough for the Url crate", response.1); continue;}
+        };
 
         // convert bytes to page content
         let pagecontent = match page_content::PageContent::from_html(&bytes_slice) {
@@ -89,7 +128,7 @@ fn crawler_thread(db: &mut database::Database, max_crawl_depth: u8, crawler_id: 
                     t
                 },
                 Err(_t) => {
-                    match url_object.join(raw_crawled_url) {
+                    match dereferenced_url_object.join(raw_crawled_url) {
                         Ok(mut t) => {
                             filter_url(&mut t);
                             t
@@ -113,10 +152,10 @@ fn crawler_thread(db: &mut database::Database, max_crawl_depth: u8, crawler_id: 
                 None => continue
             };
 
-            if crawled_url_host == url_object.domain().unwrap() {
+            if crawled_url_host == dereferenced_url_object.domain().unwrap() {
                 // has to be nested since we dont want depth above max being put on the queue
                 if depth + 1 <= max_crawl_depth {
-                    // add the url to the queue, and set the id of the crawler responsible for it
+                    // add the url to the queue, and set the id of the crawler responsible for it. One crawler crawl one webpage, this makes it easier to respect the crawl_delay
                     let _ = db.urlqueue_push(crawled_url.as_str(), depth+1, crawler_id);
                 }
             } else {
@@ -125,16 +164,16 @@ fn crawler_thread(db: &mut database::Database, max_crawl_depth: u8, crawler_id: 
             }
         }
         
-        //add to usedurls
-        let _ = db.crawledurls_add(url_string);
+        // add the url to the list of crawled urls
+        let _ = db.crawledurls_add(dereferenced_url_object.as_str());
         
-        //convert pagecontent to crawled url
+        // convert pagecontent to crawled url
         let crawled_page = crawled_page::CrawledPage::from_page_content(&pagecontent, url_string).unwrap();
         
-        //write crawledurl to disk
+        // write crawledurl to disk
         db.write_crawled_page(&crawled_page);
         
-        //one page a second only on successful scrapes (good? idk)
+        // one page every 5 seconds only on successful scrapes (good? idk?)
         sleep(Duration::new(5, 0));
     }
 }
@@ -152,9 +191,9 @@ fn convert_url_to_domain(url: &url::Url) -> url::Url {
     return converted_url;
 }
 
-fn reqwest_url(url: &str) -> Result<Vec<u8>, String> {
+fn reqwest_url(url: &str) -> Result<(Vec<u8>, String), String> {
     let client = reqwest::blocking::Client::builder()
-        .user_agent("Mozilla/5.0 (X11; Linux x86_64; rv:142.0) Gecko/20100101 Firefox/142.0")
+        .user_agent(USER_AGENT)
         .build()
         .unwrap();
     
@@ -194,5 +233,6 @@ fn reqwest_url(url: &str) -> Result<Vec<u8>, String> {
         Err(_) => return Err("Could not get bytes".to_string())
     };
 
-    return Ok(bytes.to_vec())
+    // returning the url lets us know what the actual url is when dereferencing 3XX Urls
+    return Ok((bytes.to_vec(), url.to_owned()))
 }

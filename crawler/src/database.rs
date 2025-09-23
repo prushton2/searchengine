@@ -119,7 +119,7 @@ impl Database {
         };
     }
 
-    pub fn urlqueue_count(self: &mut Self) -> i32 {
+    pub fn urlqueue_count(self: &mut Self) -> i64 {
         let row = match self.client.query_one(
             "SELECT COUNT(*) FROM urlqueue",
             &[]
@@ -127,7 +127,7 @@ impl Database {
             Ok(t) => t,
             Err(_) => return 0
         };
-        return row.get::<&str, i32>("count")
+        return row.get::<&str, i64>("count")
     }
 
     pub fn urlqueue_pop_front(self: &mut Self, crawler_id: i32) -> Option<(String, u8)> {
