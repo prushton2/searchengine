@@ -15,8 +15,9 @@ Options:
 | **MAX_CRAWL_DEPTH** | `uint8_t` | How many pages deep into a domain should the crawler go |
 | **CRAWLER_THREADS** | `u32` | How many crawlers should be running at once |
 | **VITE_BACKEND_URL** | `string` | URL of the backend |
-| **FRONTEND_PORT** | | What port the docker compose should expose as the frontend port |
-| **BACKEND_PORT** | | What port the docker compose should expose as the backend port |
+| **ENVIRONMENT**| `dev\|prod` | Environment the stack is running in |
+| **FRONTEND_PORT** | `port` | What port the docker compose should expose as the frontend port |
+| **BACKEND_PORT** | `port` | What port the docker compose should expose as the backend port |
 
 
 

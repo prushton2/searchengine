@@ -41,6 +41,7 @@ fn main() {
 fn crawler_thread(db: &mut database::Database, max_crawl_depth: u8, crawler_id: i32) {
     let mut previous_domain: String = String::from("");
     let mut robotstxt: String = String::from("");
+    let environment = dotenv::var("ENVIRONMENT").unwrap();
     
     loop {
         let mut matcher = DefaultMatcher::default();
@@ -82,7 +83,9 @@ fn crawler_thread(db: &mut database::Database, max_crawl_depth: u8, crawler_id: 
                 Err(_) => "user-agent: *\ndisallow:".into(),
             };
 
-            println!("New robots.txt file fetched from {} for crawler id {}", robots_path.domain().expect("Bad url_object host"), crawler_id);
+            if environment == "dev" {
+                println!("New robots.txt file fetched from {} for crawler id {}", robots_path.domain().expect("Bad url_object host"), crawler_id);
+            }
             previous_domain = robots_path.domain().expect("Bad url_object host").to_string();
         }
 
@@ -97,7 +100,9 @@ fn crawler_thread(db: &mut database::Database, max_crawl_depth: u8, crawler_id: 
             _ => {}
         };
         
-        println!("{}: {}", depth, url_string);
+        if environment == "dev" {
+            println!("{}: {}", depth, url_string);
+        }
         
         // fetch url as bytes
         let response: (Vec<u8>, String) = match reqwest_url(&url_string) {
