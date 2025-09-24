@@ -56,6 +56,8 @@ The indexer takes crawled data and sorts it by word.
 The backend gets a search request and compiles the requested sites for the frontend
 
 ## Issues
+### Not Started
+* Lowercase all letters in query
 ### In Progress
 ### Resolved
 * It doesnt return sorted data
