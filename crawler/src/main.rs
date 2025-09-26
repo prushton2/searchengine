@@ -35,7 +35,7 @@ fn main() {
         let _ = db.urlqueue_push("https://example.com", 0, 0);
     }
     
-    println!("Crawler running")
+    println!("Crawler running");
 
     crawler_thread(&mut db, max_crawl_depth, 1);
 }
