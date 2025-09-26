@@ -77,10 +77,12 @@ func search(w http.ResponseWriter, r *http.Request) {
 
 	start := time.Now().UnixNano() / int64(time.Millisecond)
 
+	var nonAlphanumericRegex = regexp.MustCompile(`[^a-zA-Z0-9 ]+`)
+
 	query := r.URL.Query()
 	rawSearch := query.Get("s")
-	var nonAlphanumericRegex = regexp.MustCompile(`[^a-zA-Z0-9 ]+`)
 	rawSearch = nonAlphanumericRegex.ReplaceAllString(rawSearch, " ")
+	rawSearch = strings.ToLower(rawSearch)
 	search := strings.Split(rawSearch, " ")
 
 	pageNo, err := strconv.ParseInt(query.Get("p"), 10, 64)
@@ -156,6 +158,7 @@ func main() {
 	dbinfo.Password = os.Getenv("POSTGRES_DB_PASSWORD")
 	dbinfo.Dbname = os.Getenv("POSTGRES_DB_DATABASE")
 
+	fmt.Printf(" ----- Database Authentication ----- \n")
 	fmt.Printf("username: %s\n", os.Getenv("POSTGRES_DB_USER"))
 	fmt.Printf("password: %s\n", os.Getenv("POSTGRES_DB_PASSWORD"))
 	fmt.Printf("host:     %s\n", os.Getenv("POSTGRES_DB_HOST"))
