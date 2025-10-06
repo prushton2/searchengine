@@ -18,8 +18,8 @@ impl CrawledPage {
     pub fn from_page_content(page: &PageContent, url: &str) -> Result<CrawledPage, String> {
         let mut crawled_page = CrawledPage{
             version: 1,
-            title: String::from(page.title.clone()).to_lowercase(),
-            url: String::from(url).to_lowercase(),
+            title: String::from(page.title.clone()),
+            url: String::from(url),
             description: String::from(page.description.clone()),
             words: [].into()
         };
@@ -42,10 +42,8 @@ impl CrawledPage {
             if trimmed == "" {
                 continue;
             }
-
-            let lowercase_trimmed = trimmed.to_lowercase();
     
-            crawled_page.words.entry(lowercase_trimmed).and_modify(|c| *c += 1).or_insert(1);
+            crawled_page.words.entry(trimmed).and_modify(|c| *c += 1).or_insert(1);
         }
     
         Ok(crawled_page)

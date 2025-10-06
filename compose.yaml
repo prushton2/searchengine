@@ -49,11 +49,11 @@ services:
         condition: service_healthy
 
   db:
-    image: postgres
+    image: postgres:16
     restart: always
     shm_size: 128mb
     volumes:
-      - "./postgres-data/data:/var/lib/postgresql/data/"
+      - ./postgres-data/data:/var/lib/postgresql/data/
     ports:
       - 5432:5432
     environment:

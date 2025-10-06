@@ -37,7 +37,7 @@ impl CrawledPage {
 
         // cloning this lets me pass ownership to page and consumes the clone
         for (word, count) in self.words.clone().into_iter() {
-            page.words.insert(word, count);
+            page.words.insert(word.to_lowercase(), count);
         }
 
         let parsed_url = Url::parse(&self.url).unwrap();
@@ -46,7 +46,7 @@ impl CrawledPage {
 
         // add the domain components so you can search 'google' and get google.com
         for domain_string in parsed_url.host().unwrap().to_string().split('.') {
-            page.words.insert(domain_string.to_string(), 10);
+            page.words.insert(domain_string.to_string().to_lowercase(), 10);
         }
 
         // do the same with the path, but lower score
@@ -54,7 +54,7 @@ impl CrawledPage {
             if path_component == "" {
                 continue;
             }
-            page.words.insert(path_component.to_string(), 5);
+            page.words.insert(path_component.to_string().to_lowercase(), 5);
         }
 
         return Ok(page)
