@@ -154,6 +154,7 @@ fn crawler_thread(db: &mut database::Database, max_crawl_depth: u8, crawler_id: 
                 continue;
             }
 
+            // no host, no index
             let crawled_url_host: &str = match crawled_url.domain() {
                 Some(t) => t,
                 None => continue
@@ -175,10 +176,10 @@ fn crawler_thread(db: &mut database::Database, max_crawl_depth: u8, crawler_id: 
         let _ = db.crawledurls_add(dereferenced_url_object.as_str());
         
         // convert pagecontent to crawled url
-        let crawled_page = crawled_page::CrawledPage::from_page_content(&pagecontent, url_string).unwrap();
+        let crawledpage = crawled_page::CrawledPage::from_page_content(&pagecontent, url_string).unwrap();
         
         // write crawledurl to disk
-        db.write_crawled_page(&crawled_page);
+        db.write_crawled_page(&crawledpage);
         
         // one page every 5 seconds only on successful scrapes (good? idk?)
         sleep(Duration::new(5, 0));
