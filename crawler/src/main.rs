@@ -32,7 +32,7 @@ fn main() {
     // ensure there is a starter url
     if db.urlqueue_count() == 0 {
         // empty, add starting url
-        let _ = db.urlqueue_push("https://example.com", 0, 0);
+        let _ = db.urlqueue_push("https://en.wikipedia.org/wiki/Banana_republic", 0, 0);
     }
     
     println!("Crawler running");
