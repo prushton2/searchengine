@@ -47,20 +47,24 @@ impl CrawledPage {
         // add the domain components so you can search 'google' and get google.com
         let binding = parsed_url.host().unwrap().to_string();
         let mut split_domain = binding.split('.');
-        let _ = split_domain.next_back();
+        
+        // this is the tld. pop it off
+        let _ = split_domain.next_back(); 
 
-        match split_domain.next_back() {
+        //this is the domain name, give it a higher score
+        match split_domain.next_back() { 
             Some(t) => {
                 page.words.insert(t.to_string().to_lowercase(), 20);
             },
             None => {}
         }
-
-        for domain_string in split_domain {
+        
+        // all subdomains, give a high score
+        for domain_string in split_domain { 
             page.words.insert(domain_string.to_string().to_lowercase(), 10);
         }
 
-        // do the same with the path, but lower score
+        // give each path segment a low score
         for path_component in Self::filter_text(parsed_url.path()).split(' ') {
             if path_component == "" {
                 continue;
