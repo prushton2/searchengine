@@ -44,11 +44,10 @@ fn main() {
 
     let mut threads = vec![];
 
-    for i in 0..crawler_threads {
+    for i in 1..crawler_threads+1 {
         let safe = Arc::clone(&safe_db);
         threads.push(thread::spawn(move || {
             crawler_thread(safe, max_crawl_depth, i.into());
-            // println!("{}", i);
         }));
     }
 
@@ -140,7 +139,7 @@ fn crawler_thread(db_arc_mutex: Arc<Mutex<database::Database>>, max_crawl_depth:
         // convert bytes to page content
         let pagecontent = match page_content::PageContent::from_html(&bytes_slice) {
             Ok(t) => t,
-            Err(_t) => { println!("crawler-{}  |Failed to strip html from {}, skipping", crawler_id, &url_string); continue }
+            Err(_t) => { println!("crawler-{}  | Failed to strip html from {}, skipping", crawler_id, &url_string); continue }
         };
         
         //append crawled urls to urlqueue, do some filtering, and increment depth
