@@ -14,6 +14,7 @@ pub struct CrawledPage {
     pub description: String,
     pub words: HashMap<String, u32>
 }
+
 impl CrawledPage {
     pub fn from_page_content(page: &PageContent, url: &str) -> Result<CrawledPage, String> {
         let mut crawled_page = CrawledPage{

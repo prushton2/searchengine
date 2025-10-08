@@ -171,8 +171,6 @@ func main() {
 		return
 	}
 
-	// conn = connection
-
 	http.HandleFunc("/search", search)
 
 	fmt.Println("Running server")
