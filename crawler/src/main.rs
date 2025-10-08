@@ -1,5 +1,7 @@
 use std::time::{Duration};
+use std::thread;
 use std::thread::sleep;
+use std::sync::{Mutex, Arc};
 use std::str;
 use dotenv;
 
@@ -14,6 +16,7 @@ static USER_AGENT: &str = "search.prushton.com/1.0 (https://github.com/prushton2
 
 fn main() {
     let max_crawl_depth: u8 = dotenv::var("MAX_CRAWL_DEPTH").unwrap().parse().expect("Invalid crawl depth, must be an unsigned 8 bit integer");
+    let crawler_threads: u8 = dotenv::var("CRAWLER_THREADS").unwrap().parse().expect("Invalid crawler threads count, must be an unsigned 8 bit integer");
 
     let dbinfo = database::DBInfo{
         host: dotenv::var("POSTGRES_DB_HOST").unwrap(),
@@ -34,13 +37,28 @@ fn main() {
         // empty, add starting url
         let _ = db.urlqueue_push("https://en.wikipedia.org/wiki/Banana_republic", 0, 0);
     }
+
+    let safe_db = Arc::new(Mutex::new(db));
     
     println!("Crawler running");
 
-    crawler_thread(&mut db, max_crawl_depth, 1);
+    let mut threads = vec![];
+
+    for i in 0..crawler_threads {
+        let safe = Arc::clone(&safe_db);
+        threads.push(thread::spawn(move || {
+            crawler_thread(safe, max_crawl_depth, i.into());
+            // println!("{}", i);
+        }));
+    }
+
+    for thread in threads {
+        thread.join().unwrap()
+    }
+
 }
 
-fn crawler_thread(db: &mut database::Database, max_crawl_depth: u8, crawler_id: i32) {
+fn crawler_thread(db_arc_mutex: Arc<Mutex<database::Database>>, max_crawl_depth: u8, crawler_id: i32) {
     let mut previous_domain: String = String::from("");
     let mut robotstxt: String = String::from("");
     let environment = dotenv::var("ENVIRONMENT").unwrap();
@@ -48,6 +66,7 @@ fn crawler_thread(db: &mut database::Database, max_crawl_depth: u8, crawler_id: 
     loop {
         let mut matcher = DefaultMatcher::default();
 
+        let mut db = db_arc_mutex.lock().unwrap();
         // get the url object from queue and do some preprocessing
         let raw_url_object: (String, u8) = match db.urlqueue_pop_front(crawler_id) {
             Some(t) => t,
@@ -86,7 +105,7 @@ fn crawler_thread(db: &mut database::Database, max_crawl_depth: u8, crawler_id: 
             };
 
             if environment == "dev" {
-                println!("New robots.txt file fetched from {} for crawler id {}", robots_path.domain().expect("Bad url_object host"), crawler_id);
+                println!("crawler-{}  | New robots.txt file fetched from {}", crawler_id, robots_path.domain().expect("Bad url_object host"));
             }
             previous_domain = robots_path.domain().expect("Bad url_object host").to_string();
         }
@@ -103,25 +122,25 @@ fn crawler_thread(db: &mut database::Database, max_crawl_depth: u8, crawler_id: 
         };
         
         if environment == "dev" {
-            println!("{}: {}", depth, url_string);
+            println!("crawler-{}  | {}: {}", crawler_id, depth, url_string);
         }
         
         // fetch url as bytes
         let response: (Vec<u8>, String) = match reqwest_url(&url_string) {
             Ok(t) => t,
-            Err(t) => { println!("Failed to get {}: {}, skipping", &url_string, t); continue; }
+            Err(t) => { println!("crawler-{}  | Failed to get {}: {}, skipping", crawler_id, &url_string, t); continue; }
         };
         let bytes_slice = response.0.as_slice();
 
         let dereferenced_url_object = match Url::parse(&response.1) {
             Ok(t) => t,
-            Err(_) => { println!("Somehow the redirect url {} was valid enough to fetch, but isnt valid enough for the Url crate", response.1); continue;}
+            Err(_) => { println!("crawler-{}  | Somehow the redirect url {} was valid enough to fetch, but isnt valid enough for the Url crate", crawler_id, response.1); continue;}
         };
 
         // convert bytes to page content
         let pagecontent = match page_content::PageContent::from_html(&bytes_slice) {
             Ok(t) => t,
-            Err(_t) => { println!("Failed to strip html from {}, skipping", &url_string); continue }
+            Err(_t) => { println!("crawler-{}  |Failed to strip html from {}, skipping", crawler_id, &url_string); continue }
         };
         
         //append crawled urls to urlqueue, do some filtering, and increment depth
@@ -181,6 +200,7 @@ fn crawler_thread(db: &mut database::Database, max_crawl_depth: u8, crawler_id: 
         // write crawledurl to disk
         db.write_crawled_page(&crawledpage);
         
+        drop(db);
         // one page every 5 seconds only on successful scrapes (good? idk?)
         sleep(Duration::new(5, 0));
     }
