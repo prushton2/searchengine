@@ -45,7 +45,18 @@ impl CrawledPage {
         // some extra postprocessing can be done to ensure we deal with .ext files
 
         // add the domain components so you can search 'google' and get google.com
-        for domain_string in parsed_url.host().unwrap().to_string().split('.') {
+        let binding = parsed_url.host().unwrap().to_string();
+        let mut split_domain = binding.split('.');
+        let _ = split_domain.next_back();
+
+        match split_domain.next_back() {
+            Some(t) => {
+                page.words.insert(t.to_string().to_lowercase(), 20);
+            },
+            None => {}
+        }
+
+        for domain_string in split_domain {
             page.words.insert(domain_string.to_string().to_lowercase(), 10);
         }
 
