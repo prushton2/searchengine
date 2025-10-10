@@ -64,20 +64,22 @@ fn crawler_thread(db_arc_mutex: Arc<Mutex<database::Database>>, max_crawl_depth:
     let mut i = 0;
 
     loop {
-        if i >= 20 {
-            return
-        }
-        i++;
-        
         let mut matcher = DefaultMatcher::default();
-
         let mut db = db_arc_mutex.lock().unwrap();
-        // get the url object from queue and do some preprocessing
+        println!("crawler-{}  | Acquired DB Lock", crawler_id);
+
+        // -- get the url of the site to crawl --
         let raw_url_object: (String, u8) = match db.urlqueue_pop_front(crawler_id) {
             Some(t) => t,
-            None => {println!("Crawler ran out of urls"); break}
+            None => {
+                println!("crawler-{}  | Crawler ran out of urls", crawler_id);
+                println!("crawler-{}  | Relinquishing DB Lock", crawler_id);
+                drop(db);
+                thread::sleep(Duration::from_millis(5000));
+                return
+            }
         };
-        
+
         let url_object = match Url::parse(&raw_url_object.0) {
             Ok(mut t) => {filter_url(&mut t); t},
             Err(_t) => continue
@@ -87,68 +89,53 @@ fn crawler_thread(db_arc_mutex: Arc<Mutex<database::Database>>, max_crawl_depth:
         let depth = raw_url_object.1;
         drop(raw_url_object);
         
+        // check if its in depth
         if depth > max_crawl_depth {
             continue;
         }
 
-        // if the url changed, we need to refetch robots.txt
+        // if the domain name changed, we need to refetch robots.txt
         if url_object.domain() != Some(previous_domain.as_str()) {
-            
-            let mut robots_path = url_object.clone();
-            robots_path.set_path("/robots.txt");
-            robots_path.set_query(None);
-            robots_path.set_fragment(None);
-            
-            let robots_bytes: Vec<u8> = match reqwest_url(robots_path.as_str()) {
-                Ok(t) => t.0,
-                Err(_) => "user-agent: *\ndisallow:".as_bytes().to_owned()
-            };
-            
-            robotstxt = match str::from_utf8(&robots_bytes) {
-                Ok(t) => t.to_string(),
-                Err(_) => "user-agent: *\ndisallow:".into(),
-            };
-
+            robotstxt = fetch_robots_txt(&url_object);
+            previous_domain = url_object.domain().unwrap().to_string();
             if environment == "dev" {
-                println!("crawler-{}  | New robots.txt file fetched from {}", crawler_id, robots_path.domain().expect("Bad url_object host"));
+                println!("crawler-{}  | New robots.txt file fetched from {}", crawler_id, url_object.domain().unwrap());
             }
-            previous_domain = robots_path.domain().expect("Bad url_object host").to_string();
         }
 
         // check if we are allowed to crawl here
         if !matcher.one_agent_allowed_by_robots(&robotstxt, USER_AGENT, &url_string) {
-            continue
+            continue;
         }
 
-        // dont redo a url within the defined timeframe
         match db.crawledurls_status(url_string).unwrap() {
             database::UsedUrlStatus::CannotCrawlUrl => {continue;}
             _ => {}
         };
-        
+
         if environment == "dev" {
             println!("crawler-{}  | {}: {}", crawler_id, depth, url_string);
         }
-        
-        // fetch url as bytes
+
+        // do the actual fetching
         let response: (Vec<u8>, String) = match reqwest_url(&url_string) {
             Ok(t) => t,
             Err(t) => { println!("crawler-{}  | Failed to get {}: {}, skipping", crawler_id, &url_string, t); continue; }
         };
         let bytes_slice = response.0.as_slice();
-
+        // deal with the url changing on 3XX codes
         let dereferenced_url_object = match Url::parse(&response.1) {
             Ok(t) => t,
             Err(_) => { println!("crawler-{}  | Somehow the redirect url {} was valid enough to fetch, but isnt valid enough for the Url crate", crawler_id, response.1); continue;}
         };
 
-        // convert bytes to page content
+        // convert to page content
         let pagecontent = match page_content::PageContent::from_html(&bytes_slice) {
             Ok(t) => t,
             Err(_t) => { println!("crawler-{}  | Failed to strip html from {}, skipping", crawler_id, &url_string); continue }
         };
-        
-        //append crawled urls to urlqueue, do some filtering, and increment depth
+
+
         for raw_crawled_url in &pagecontent.links {
             // Tries to parse a url. if it gets something like "/domains", it fails and then tries to join the path to the parent url,
             // so it would spit out "iana.org/domains". It double fails on fragments (good thing, they are stupid anyways). Part of me 
@@ -168,7 +155,7 @@ fn crawler_thread(db_arc_mutex: Arc<Mutex<database::Database>>, max_crawl_depth:
                     }
                 }
             };
-            
+
             match db.crawledurls_status(raw_crawled_url).unwrap() {
                 database::UsedUrlStatus::CannotCrawlUrl => {continue;}
                 _ => {}
@@ -187,7 +174,7 @@ fn crawler_thread(db_arc_mutex: Arc<Mutex<database::Database>>, max_crawl_depth:
             if crawled_url_host == dereferenced_url_object.domain().unwrap() {
                 // has to be nested since we dont want depth above max being put on the queue
                 if depth + 1 <= max_crawl_depth {
-                    // add the url to the queue, and set the id of the crawler responsible for it. One crawler crawl one webpage, this makes it easier to respect the crawl_delay
+                    // add the url to the queue, and set the id of the crawler responsible for it. One crawler for one domain at a time, this makes it easier to respect the crawl_delay (still need to do)
                     let _ = db.urlqueue_push(crawled_url.as_str(), depth+1, crawler_id);
                 }
             } else {
@@ -195,8 +182,6 @@ fn crawler_thread(db_arc_mutex: Arc<Mutex<database::Database>>, max_crawl_depth:
                 let _ = db.urlqueue_push(convert_url_to_domain(&crawled_url).as_str(), 0, 0);
             }
         }
-        
-        // add the url to the list of crawled urls
         let _ = db.crawledurls_add(dereferenced_url_object.as_str());
         
         // convert pagecontent to crawled url
@@ -204,11 +189,14 @@ fn crawler_thread(db_arc_mutex: Arc<Mutex<database::Database>>, max_crawl_depth:
         
         // write crawledurl to disk
         db.write_crawled_page(&crawledpage);
+
         
+        println!("crawler-{}  | Relinquishing DB Lock", crawler_id);
         drop(db);
-        // one page every 5 seconds only on successful scrapes (good? idk?)
-        sleep(Duration::new(5, 0));
+
+        thread::sleep(Duration::from_millis(5000));
     }
+
 }
 
 fn filter_url(url: &mut url::Url) {
@@ -268,4 +256,21 @@ fn reqwest_url(url: &str) -> Result<(Vec<u8>, String), String> {
 
     // returning the url lets us know what the actual url is when dereferencing 3XX Urls
     return Ok((bytes.to_vec(), url.to_owned()))
+}
+
+fn fetch_robots_txt(url_object: &url::Url) -> String {
+    let mut robots_path = url_object.clone();
+    robots_path.set_path("/robots.txt");
+    robots_path.set_query(None);
+    robots_path.set_fragment(None);
+    
+    let robots_bytes: Vec<u8> = match reqwest_url(robots_path.as_str()) {
+        Ok(t) => t.0,
+        Err(_) => "user-agent: *\ndisallow:".as_bytes().to_owned()
+    };
+    
+    return match str::from_utf8(&robots_bytes) {
+        Ok(t) => t.to_string(),
+        Err(_) => "user-agent: *\ndisallow:".into(),
+    };
 }
