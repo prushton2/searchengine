@@ -61,8 +61,14 @@ fn crawler_thread(db_arc_mutex: Arc<Mutex<database::Database>>, max_crawl_depth:
     let mut previous_domain: String = String::from("");
     let mut robotstxt: String = String::from("");
     let environment = dotenv::var("ENVIRONMENT").unwrap();
-    
+    let mut i = 0;
+
     loop {
+        if i >= 20 {
+            return
+        }
+        i++;
+        
         let mut matcher = DefaultMatcher::default();
 
         let mut db = db_arc_mutex.lock().unwrap();
