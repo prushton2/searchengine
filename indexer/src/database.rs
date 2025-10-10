@@ -69,23 +69,23 @@ impl Database {
             );
         }
 
-        let delete1 = self.client.execute(
-            "DELETE FROM crawleddata WHERE url = $1",
-            &[&crawled_data.url]
-        );
+        // let delete1 = self.client.execute(
+        //     "DELETE FROM crawleddata WHERE url = $1",
+        //     &[&crawled_data.url]
+        // );
 
-        let delete2 = self.client.execute(
-            "DELETE FROM crawledwords WHERE url = $1",
-            &[&crawled_data.url]
-        );
+        // let delete2 = self.client.execute(
+        //     "DELETE FROM crawledwords WHERE url = $1",
+        //     &[&crawled_data.url]
+        // );
 
-        if delete1.is_err() {
-            println!("Failed to delete {} from crawleddata\n   err: {:?}\n", crawled_data.url, delete1.err())
-        }
+        // if delete1.is_err() {
+        //     println!("Failed to delete {} from crawleddata\n   err: {:?}\n", crawled_data.url, delete1.err())
+        // }
 
-        if delete2.is_err() {
-            println!("Failed to delete {} from crawledwords\n   err: {:?}\n", crawled_data.url, delete2.err())
-        }
+        // if delete2.is_err() {
+        //     println!("Failed to delete {} from crawledwords\n   err: {:?}\n", crawled_data.url, delete2.err())
+        // }
 
         return Some(crawled_data)
     }
@@ -105,13 +105,13 @@ impl Database {
         };
 
         // remove existing indexed data about site
-        match self.client.execute(
-            "DELETE FROM indexedwords WHERE url = $1",
-            &[&indexedpage.url]
-        ) {
-            Ok(_) => {},
-            Err(t) => {panic!("{:?}", t);},
-        };
+        // match self.client.execute(
+        //     "DELETE FROM indexedwords WHERE url = $1",
+        //     &[&indexedpage.url]
+        // ) {
+        //     Ok(_) => {},
+        //     Err(t) => {panic!("{:?}", t);},
+        // };
 
         // add words
         for (word, weight) in indexedpage.words.iter() {
