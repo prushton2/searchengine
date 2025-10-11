@@ -94,6 +94,11 @@ fn crawler_thread(db_arc_mutex: Arc<Mutex<database::Database>>, max_crawl_depth:
             continue;
         }
 
+        i += 1;
+        if i > 20 {
+            return
+        }
+
         // if the domain name changed, we need to refetch robots.txt
         if url_object.domain() != Some(previous_domain.as_str()) {
             robotstxt = fetch_robots_txt(&url_object);
@@ -165,6 +170,11 @@ fn crawler_thread(db_arc_mutex: Arc<Mutex<database::Database>>, max_crawl_depth:
                 continue;
             }
 
+            // TEMPORARY - REPLACE WITH SOMETHING USEFUL PLEASE
+            if crawled_url.domain().unwrap().ends_with(".wikipedia.org") && !crawled_url.domain().unwrap().starts_with("en.wikipedia.") {
+                continue; // dont index non english sites please for the love of god
+            }
+
             // no host, no index
             let crawled_url_host: &str = match crawled_url.domain() {
                 Some(t) => t,
@@ -194,6 +204,7 @@ fn crawler_thread(db_arc_mutex: Arc<Mutex<database::Database>>, max_crawl_depth:
         println!("crawler-{}  | Relinquishing DB Lock", crawler_id);
         drop(db);
 
+        // return;
         thread::sleep(Duration::from_millis(5000));
     }
 
