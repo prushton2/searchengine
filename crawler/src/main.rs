@@ -1,6 +1,6 @@
 use std::time::{Duration};
 use std::thread;
-use std::thread::sleep;
+// use std::thread::sleep;
 use std::sync::{Mutex, Arc};
 use std::str;
 use dotenv;
@@ -35,7 +35,7 @@ fn main() {
     // ensure there is a starter url
     if db.urlqueue_count() == 0 {
         // empty, add starting url
-        let _ = db.urlqueue_push("https://en.wikipedia.org/wiki/Banana_republic", 0, 0);
+        let _ = db.urlqueue_push("https://example.com", 0, 0);
     }
 
     let safe_db = Arc::new(Mutex::new(db));
@@ -61,22 +61,22 @@ fn crawler_thread(db_arc_mutex: Arc<Mutex<database::Database>>, max_crawl_depth:
     let mut previous_domain: String = String::from("");
     let mut robotstxt: String = String::from("");
     let environment = dotenv::var("ENVIRONMENT").unwrap();
-    let mut i = 0;
+    // let mut i = 0;
 
     loop {
         let mut matcher = DefaultMatcher::default();
         let mut db = db_arc_mutex.lock().unwrap();
-        println!("crawler-{}  | Acquired DB Lock", crawler_id);
+        // println!("crawler-{}  | Acquired DB Lock", crawler_id);
 
         // -- get the url of the site to crawl --
         let raw_url_object: (String, u8) = match db.urlqueue_pop_front(crawler_id) {
             Some(t) => t,
             None => {
                 println!("crawler-{}  | Crawler ran out of urls", crawler_id);
-                println!("crawler-{}  | Relinquishing DB Lock", crawler_id);
+                // println!("crawler-{}  | Relinquishing DB Lock", crawler_id);
                 drop(db);
                 thread::sleep(Duration::from_millis(5000));
-                return
+                continue
             }
         };
 
@@ -94,10 +94,10 @@ fn crawler_thread(db_arc_mutex: Arc<Mutex<database::Database>>, max_crawl_depth:
             continue;
         }
 
-        i += 1;
-        if i > 20 {
-            return
-        }
+        // i += 1;
+        // if i > 100 {
+        //     return
+        // }
 
         // if the domain name changed, we need to refetch robots.txt
         if url_object.domain() != Some(previous_domain.as_str()) {
@@ -171,8 +171,11 @@ fn crawler_thread(db_arc_mutex: Arc<Mutex<database::Database>>, max_crawl_depth:
             }
 
             // TEMPORARY - REPLACE WITH SOMETHING USEFUL PLEASE
-            if crawled_url.domain().unwrap().ends_with(".wikipedia.org") && !crawled_url.domain().unwrap().starts_with("en.wikipedia.") {
-                continue; // dont index non english sites please for the love of god
+            if crawled_url.domain().is_some() {
+                // dont index non english wiki sites please for the love of god
+                if crawled_url.domain().unwrap().ends_with(".wikipedia.org") && !crawled_url.domain().unwrap().starts_with("en.wikipedia.") {
+                    continue;
+                }
             }
 
             // no host, no index
@@ -199,9 +202,8 @@ fn crawler_thread(db_arc_mutex: Arc<Mutex<database::Database>>, max_crawl_depth:
         
         // write crawledurl to disk
         db.write_crawled_page(&crawledpage);
-
         
-        println!("crawler-{}  | Relinquishing DB Lock", crawler_id);
+        // println!("crawler-{}  | Relinquishing DB Lock", crawler_id);
         drop(db);
 
         // return;

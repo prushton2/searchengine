@@ -39,6 +39,8 @@ fn indexer_thread(db: &mut database::Database) -> Result<&'static str, &'static 
             None => {continue;}
         };
 
+        // println!("Found crawled page");
+
         let _ = crawledpage.filter_stop_words();
         
         let indexedpage = match crawledpage.index() {
@@ -46,7 +48,7 @@ fn indexer_thread(db: &mut database::Database) -> Result<&'static str, &'static 
             Err(_) => {continue;}
         };
 
-        let _ = db.write_indexed_metadata(&indexedpage);
+        let _ = db.write_indexed_page(&indexedpage);
     }
 
     return Ok("")
