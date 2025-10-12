@@ -82,24 +82,29 @@ impl Database {
     }
 
     pub fn write_crawled_page(self: &mut Self, crawledpage: &crawled_page::CrawledPage) {
+        let mut urls: Vec<String> = vec![];
+        let mut words: Vec<String> = vec![];
+        let mut counts: Vec<i32> = vec![];
+
         for (word, count) in crawledpage.words.iter() {
             if word.len() > 64 {
                 continue;
             }
-            
-            let lowercaseword = word.to_lowercase();
-            match self.client.execute(
-                "INSERT INTO crawledwords VALUES ($1, $2, $3)
-                ON CONFLICT (url, word) 
-                DO UPDATE SET
-                count = $3",
-                &[&crawledpage.url, &lowercaseword, &(*count as i32)]
-            ) {
-                Ok(_) => {},
-                Err(t) => panic!("Error writing to database: {}", t)
-            };
-        }
 
+            urls.push(crawledpage.url.clone());
+            words.push(word.clone());
+            counts.push((*count) as i32);
+            
+        }
+        
+        match self.client.execute(
+            "INSERT INTO crawledwords (url, word, count)
+            SELECT * FROM UNNEST($1::text[], $2::text[], $3::int[])",
+            &[&urls, &words, &counts]
+        ) {
+            Ok(_) => {},
+            Err(t) => panic!("Error writing to database: {}", t)
+        };
         /*  
             This is at the end because i cant be bothered to lock the db
             tldr: The crawleddata gets written -> indexer pops new crawleddata entry ->

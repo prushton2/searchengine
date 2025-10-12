@@ -38,7 +38,7 @@ impl CrawledPage {
         let alphanumeric_text = page.text.replacen(|c| {!char::is_alphanumeric(c)}, " ", usize::MAX);
     
         for word in alphanumeric_text.as_str().split(' ') {
-            let trimmed = word.trim().chars().filter(|c| c.is_alphanumeric()).collect::<String>();
+            let trimmed = word.trim().chars().filter(|c| c.is_alphanumeric()).collect::<String>().to_lowercase();
     
             if trimmed == "" {
                 continue;

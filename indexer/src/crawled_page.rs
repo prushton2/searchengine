@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 use url::Url;
+use std::hash::Hash;
+use std::ops::Add;
 
 use crate::indexed_page;
 use crate::dictionary;
@@ -35,33 +37,39 @@ impl CrawledPage {
             words: [].into()
         };
 
+        // give each word in the body a score in the indexed data
         // cloning this lets me pass ownership to page and consumes the clone
         for (word, count) in self.words.clone().into_iter() {
-            page.words.insert(word.to_lowercase(), count);
+            let score = (count.ilog2()+1) as u64;
+            if score > 2 {
+                page.words.insert_or_sum(word, score as u64);
+            }
         }
-
+        
         let parsed_url = Url::parse(&self.url).unwrap();
-
-        // some extra postprocessing can be done to ensure we deal with .ext files
-
         // add the domain components so you can search 'google' and get google.com
         let binding = parsed_url.host().unwrap().to_string();
         let mut split_domain = binding.split('.');
         
-        // this is the tld. pop it off
-        let _ = split_domain.next_back(); 
+        // this is the tld. give it a score so you can search "iana.org"
+        match split_domain.next_back() { 
+            Some(t) => {
+                page.words.insert_or_sum(t.to_string().to_lowercase(), 15);
+            },
+            None => {}
+        }
 
         //this is the domain name, give it a higher score
         match split_domain.next_back() { 
             Some(t) => {
-                page.words.insert(t.to_string().to_lowercase(), 20);
+                page.words.insert_or_sum(t.to_string().to_lowercase(), 20);
             },
             None => {}
         }
         
         // all subdomains, give a high score
         for domain_string in split_domain { 
-            page.words.insert(domain_string.to_string().to_lowercase(), 10);
+            page.words.insert_or_sum(domain_string.to_string().to_lowercase(), 10);
         }
 
         // give each path segment a low score
@@ -69,7 +77,7 @@ impl CrawledPage {
             if path_component == "" {
                 continue;
             }
-            page.words.insert(path_component.to_string().to_lowercase(), 5);
+            page.words.insert_or_sum(path_component.to_string().to_lowercase(), 5);
         }
 
         return Ok(page)
@@ -79,4 +87,21 @@ impl CrawledPage {
         return string.replacen(|c| {!char::is_alphanumeric(c)}, " ", usize::MAX)
     }
 
+}
+
+pub trait MyTrait<K,V> { fn insert_or_sum(&mut self, key: K, val: V); }
+
+impl<K,V> MyTrait<K,V> for HashMap<K,V> 
+where
+    K: Eq + Hash + Clone,
+    V: Add<Output = V> + Clone
+{
+    fn insert_or_sum(&mut self, key: K, val: V) {
+        match self.insert(key.clone(), val.clone()) {
+            Some(n) => {
+                self.insert(key, n+val);
+            },
+            None => {}
+        };
+    }
 }
