@@ -40,7 +40,10 @@ impl CrawledPage {
         // give each word in the body a score in the indexed data
         // cloning this lets me pass ownership to page and consumes the clone
         for (word, count) in self.words.clone().into_iter() {
-            page.words.insert_or_sum(word, (count.ilog2()+1) as u64);
+            let score = (count.ilog2()+1) as u64;
+            if score > 2 {
+                page.words.insert_or_sum(word, score as u64);
+            }
         }
         
         let parsed_url = Url::parse(&self.url).unwrap();
@@ -48,8 +51,13 @@ impl CrawledPage {
         let binding = parsed_url.host().unwrap().to_string();
         let mut split_domain = binding.split('.');
         
-        // this is the tld. pop it off
-        let _ = split_domain.next_back(); 
+        // this is the tld. give it a score so you can search "iana.org"
+        match split_domain.next_back() { 
+            Some(t) => {
+                page.words.insert_or_sum(t.to_string().to_lowercase(), 15);
+            },
+            None => {}
+        }
 
         //this is the domain name, give it a higher score
         match split_domain.next_back() { 
