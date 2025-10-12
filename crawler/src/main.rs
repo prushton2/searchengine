@@ -35,7 +35,7 @@ fn main() {
     // ensure there is a starter url
     if db.urlqueue_count() == 0 {
         // empty, add starting url
-        let _ = db.urlqueue_push("https://example.com", 0, 0);
+        let _ = db.urlqueue_push("http://en.wikipedia.org/wiki/Banana_republic", 0, 0);
     }
 
     let safe_db = Arc::new(Mutex::new(db));
@@ -125,7 +125,7 @@ fn crawler_thread(db_arc_mutex: Arc<Mutex<database::Database>>, max_crawl_depth:
         // do the actual fetching
         let response: (Vec<u8>, String) = match reqwest_url(&url_string) {
             Ok(t) => t,
-            Err(t) => { println!("crawler-{}  | Failed to get {}: {}, skipping", crawler_id, &url_string, t); continue; }
+            Err(t) => { println!("crawler-{}  | Failed to get: {}, skipping", crawler_id, t); continue; }
         };
         let bytes_slice = response.0.as_slice();
         // deal with the url changing on 3XX codes
@@ -168,14 +168,6 @@ fn crawler_thread(db_arc_mutex: Arc<Mutex<database::Database>>, max_crawl_depth:
 
             if crawled_url.scheme() != "https" && crawled_url.scheme() != "http" {
                 continue;
-            }
-
-            // TEMPORARY - REPLACE WITH SOMETHING USEFUL PLEASE
-            if crawled_url.domain().is_some() {
-                // dont index non english wiki sites please for the love of god
-                if crawled_url.domain().unwrap().ends_with(".wikipedia.org") && !crawled_url.domain().unwrap().starts_with("en.wikipedia.") {
-                    continue;
-                }
             }
 
             // no host, no index
@@ -260,6 +252,15 @@ fn reqwest_url(url: &str) -> Result<(Vec<u8>, String), String> {
 
     if !content_type.to_str().unwrap().contains("text/html") {
         return Err("Content type is not html".to_string())
+    }
+
+    let content_lang = match result.headers().get("content-language") {
+        Some(t) => t.to_str().unwrap(),
+        None => "en"
+    };
+
+    if content_lang !=  "en" {
+        return Err("Content language is not english".to_string())
     }
 
     let bytes = match result.bytes() {
