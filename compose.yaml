@@ -10,16 +10,16 @@ services:
     env_file:
       - .env
 
-   indexer:
-     build: indexer
-     restart: always
+  indexer:
+    build: indexer
+    restart: always
 
-     depends_on:
-       db:   
-         condition: service_healthy
+    depends_on:
+      db:   
+        condition: service_healthy
 
-     env_file:
-       - .env
+    env_file:
+      - .env
 
   backend:
     build: backend
