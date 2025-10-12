@@ -94,11 +94,6 @@ fn crawler_thread(db_arc_mutex: Arc<Mutex<database::Database>>, max_crawl_depth:
             continue;
         }
 
-        // i += 1;
-        // if i > 100 {
-        //     return
-        // }
-
         // if the domain name changed, we need to refetch robots.txt
         if url_object.domain() != Some(previous_domain.as_str()) {
             robotstxt = fetch_robots_txt(&url_object);

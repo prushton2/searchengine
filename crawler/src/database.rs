@@ -105,10 +105,6 @@ impl Database {
             Ok(_) => {},
             Err(t) => panic!("Error writing to database: {}", t)
         };
-        
-            // ON CONFLICT (url, word) 
-            // DO UPDATE SET
-            // count = EXCLUDED.count
         /*  
             This is at the end because i cant be bothered to lock the db
             tldr: The crawleddata gets written -> indexer pops new crawleddata entry ->
