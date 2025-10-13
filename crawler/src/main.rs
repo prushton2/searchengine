@@ -1,6 +1,5 @@
 use std::time::{Duration};
 use std::thread;
-// use std::thread::sleep;
 use std::sync::{Mutex, Arc};
 use std::str;
 use dotenv;
@@ -120,19 +119,19 @@ fn crawler_thread(db_arc_mutex: Arc<Mutex<database::Database>>, max_crawl_depth:
         // do the actual fetching
         let response: (Vec<u8>, String) = match reqwest_url(&url_string) {
             Ok(t) => t,
-            Err(t) => { println!("crawler-{}  | Failed to get: {}, skipping", crawler_id, t); continue; }
+            Err(t) => { if environment == "dev" { println!("crawler-{}  | Failed to get: {}, skipping", crawler_id, t); } continue; }
         };
         let bytes_slice = response.0.as_slice();
         // deal with the url changing on 3XX codes
         let dereferenced_url_object = match Url::parse(&response.1) {
             Ok(t) => t,
-            Err(_) => { println!("crawler-{}  | Somehow the redirect url {} was valid enough to fetch, but isnt valid enough for the Url crate", crawler_id, response.1); continue;}
+            Err(_) => { println!("crawler-{}  | Somehow the redirect url {} was valid enough to fetch, but isnt valid enough for the Url crate", crawler_id, response.1); continue; }
         };
 
         // convert to page content
         let pagecontent = match page_content::PageContent::from_html(&bytes_slice) {
             Ok(t) => t,
-            Err(_t) => { println!("crawler-{}  | Failed to strip html from {}, skipping", crawler_id, &url_string); continue }
+            Err(_t) => { if environment == "dev" { println!("crawler-{}  | Failed to strip html from {}, skipping", crawler_id, &url_string); } continue; }
         };
 
 
@@ -225,7 +224,10 @@ fn reqwest_url(url: &str) -> Result<(Vec<u8>, String), String> {
 
     if result.status().is_redirection() {
         let redirect_to = match result.headers().get("location") {
-            Some(t) => t.to_str().unwrap(),
+            Some(t) => match t.to_str() {
+                Ok(t) => t,
+                Err(t) => return Err(format!("Error getting redirect location: {}", t))
+            },
             None => return Err("Couldnt find location header".to_string())
         };
 
@@ -250,11 +252,11 @@ fn reqwest_url(url: &str) -> Result<(Vec<u8>, String), String> {
     }
 
     let content_lang = match result.headers().get("content-language") {
-        Some(t) => t.to_str().unwrap(),
-        None => "en"
+        Some(t) => t.to_str(),
+        None => Ok("en")
     };
 
-    if content_lang !=  "en" {
+    if content_lang.is_err() || content_lang.unwrap() != "en" {
         return Err("Content language is not english".to_string())
     }
 

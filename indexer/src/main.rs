@@ -14,20 +14,22 @@ fn main() {
         dbname: dotenv::var("POSTGRES_DB_DATABASE").unwrap(),
     };
 
+    let environment: String = dotenv::var("ENVIRONMENT").unwrap();
+
     let mut db = database::Database::new(&dbinfo);
 
     loop {
         let start = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).expect("").as_millis();
-        println!("Starting index...");
+        if environment == "dev" { println!("Starting index..."); }
 
         match indexer_thread(&mut db) {
-            Ok(_) => println!("Index successful"),
+            Ok(_) =>  if environment == "dev" { println!("Index successful"); },
             Err(t) => println!("Index failed: {}", t),
         };
 
         let end = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).expect("").as_millis();
         let dt: f64 = ((end - start) as f64) /1000.0;
-        println!("Index took {} seconds", dt);
+        if environment == "dev" { println!("Index took {} seconds", dt); }
         sleep(Duration::new(20, 0));
     }
 }
@@ -38,8 +40,6 @@ fn indexer_thread(db: &mut database::Database) -> Result<&'static str, &'static 
             Some(t) => t,
             None => {continue;}
         };
-
-        // println!("Found crawled page");
 
         let _ = crawledpage.filter_stop_words();
         
