@@ -4,9 +4,9 @@ use std::str;
 
 use crate::http_request;
 // Handles interfacing with robots.txt
-
+    
 pub trait RobotsTXT {
-    fn new(request_object: http_request::HTTPRequest) -> Self;
+    fn new(request_object: http_request::HTTPRequest) -> Self where Self: Sized;
     fn allows_url(&self, url: &str) -> bool;
     fn fetch_new_robots_txt(&mut self, url: &str) -> Result<String, String>;
 }
@@ -56,7 +56,5 @@ impl RobotsTXTCrate {
             Ok(t) => t.to_string(),
             Err(_) => "user-agent: *\ndisallow:".into(),
         };
-
-        // return String::from("")
     }
 }

@@ -5,6 +5,15 @@ pub struct HTTPRequest {
     user_agent: String
 }
 
+pub enum HTTPRequestError {
+    FailedToFetchURL,
+    FailedToRedirect(String),
+    BadStatusCode(u16),
+    MissingHeader(String),
+    BadHeaderValue(String, String),
+    CouldntConvertToBytes
+}
+
 impl HTTPRequest {
     pub fn set_user_agent(&mut self, ua: &str) {
         self.user_agent = ua.to_string();
@@ -14,7 +23,7 @@ impl HTTPRequest {
         return &self.user_agent
     }
 
-    pub fn request(&self, url: &str) -> Result<(Vec<u8>, String), String> {
+    pub fn request(&self, url: &str) -> Result<(Vec<u8>, String), HTTPRequestError> {
         let client = reqwest::blocking::Client::builder()
             .user_agent(self.user_agent.clone())
             .build()
@@ -22,36 +31,36 @@ impl HTTPRequest {
     
         let result = match client.get(url).send() {
             Ok(t) => t,
-            Err(_) => return Err("Could not get URL".to_string())
+            Err(_) => return Err(HTTPRequestError::FailedToFetchURL)
         };
 
         if result.status().is_redirection() {
             let redirect_to = match result.headers().get("location") {
                 Some(t) => match t.to_str() {
                     Ok(t) => t,
-                    Err(t) => return Err(format!("Error getting redirect location: {}", t))
+                    Err(t) => return Err(HTTPRequestError::FailedToRedirect(format!("Error getting redirect location: {}", t)))
                 },
-                None => return Err("Couldnt find location header".to_string())
+                None => return Err(HTTPRequestError::FailedToRedirect("Couldnt find location header".to_string()))
             };
 
             return self.request(redirect_to);
         }
 
         if result.status().is_client_error() || result.status().is_server_error() {
-            return Err(format!("Status Code Invalid ({})", result.status().as_str()));
+            return Err(HTTPRequestError::BadStatusCode(result.status().as_u16()));
         }
 
         let content_type = match result.headers().get("content-type") {
             Some(t) => t,
-            None => return Err("No content type header".to_string())
+            None => return Err(HTTPRequestError::MissingHeader("content-type".to_string()))
         };
 
         if content_type.to_str().is_err() {
-            return Err("Error verifying content type header".to_string())
+            return Err(HTTPRequestError::MissingHeader("content-type".to_string()))
         }
 
         if !content_type.to_str().unwrap().contains("text/html") {
-            return Err("Content type is not html".to_string())
+            return Err(HTTPRequestError::BadHeaderValue("content-type".to_string(), content_type.to_str().unwrap_or("[invalid UTF-8]").to_string()))
         }
 
         let content_lang = match result.headers().get("content-language") {
@@ -59,13 +68,18 @@ impl HTTPRequest {
             None => Ok("en")
         };
 
-        if content_lang.is_err() || content_lang.unwrap() != "en" {
-            return Err("Content language is not english".to_string())
-        }
+        match content_lang {
+            Ok(t) => {
+                if t != "en" {
+                    return Err(HTTPRequestError::BadHeaderValue("content-language".to_string(), t.to_string()))
+                }
+            }
+            Err(_) => {}
+        };
 
         let bytes = match result.bytes() {
             Ok(t) => t,
-            Err(_) => return Err("Could not get bytes".to_string())
+            Err(_) => return Err(HTTPRequestError::CouldntConvertToBytes)
         };
 
         // returning the url lets us know what the actual url is when dereferencing 3XX Urls
