@@ -11,23 +11,22 @@ pub trait RobotsTXT {
     fn fetch_new_robots_txt(&mut self, url: &str) -> Result<String, String>;
 }
 
-pub struct RobotsTXTCrate<'a> {
+pub struct RobotsTXTCrate {
     content: String,
     request_object: http_request::HTTPRequest,
-    matcher: DefaultMatcher<'a>
 }
 
-impl<'a> RobotsTXT for RobotsTXTCrate<'a> {
+impl RobotsTXT for RobotsTXTCrate {
     fn new(request_object: http_request::HTTPRequest) -> Self {
         RobotsTXTCrate{
             content: String::from(""),
             request_object: request_object,
-            matcher: DefaultMatcher::default()
         }
     }
 
-    fn allows_url<'b>(&'b self, url: &'b str) -> bool {
-        return self.matcher.one_agent_allowed_by_robots(&self.content, self.request_object.get_user_agent(), url)
+    fn allows_url(&self, url: &str) -> bool {
+        let mut matcher = DefaultMatcher::default();
+        return matcher.one_agent_allowed_by_robots(&self.content, &self.request_object.get_user_agent(), url)
     }
 
     fn fetch_new_robots_txt(&mut self, url: &str) -> Result<String, String> {
@@ -41,7 +40,7 @@ impl<'a> RobotsTXT for RobotsTXTCrate<'a> {
     }
 }
 
-impl RobotsTXTCrate<'_> {
+impl RobotsTXTCrate {
     fn fetch_robots_txt(&self, url_object: &url::Url) -> String {
         let mut robots_path = url_object.clone();
         robots_path.set_path("/robots.txt");
