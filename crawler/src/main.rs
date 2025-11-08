@@ -15,10 +15,10 @@ fn crawler_thread() {
     
     let mut limit = 0;
 
-    while limit < 20 {
+    while limit < 1 {
         limit += 1;
 
-        let url = "https://example.com";
+        let url = "https://trentbrownuml.github.io/html/index.html";
 
         let page_content: Vec<u8>;
         let new_url: String;
@@ -34,6 +34,9 @@ fn crawler_thread() {
             },
         }
 
-        let parsed_content: parser::ParsedData = parser::parse_html(page_content, new_url);
+        let parsed_content: parser::ParsedData = match parser::parse_html(page_content, new_url) {
+            Ok(t) => t,
+            Err(t) => {println!("Error {:?}", t); continue}
+        };
     }
 }
