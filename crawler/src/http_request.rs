@@ -18,16 +18,12 @@ pub enum HTTPRequestError {
 }
 
 impl HTTPRequest {
-    pub fn new() -> Self {
+    pub fn new(ua: &str) -> Self {
         return HTTPRequest{
-            user_agent: "Undefined UA".to_string()
+            user_agent: ua.to_string()
         }
     }
-
-    pub fn set_user_agent(&mut self, ua: &str) {
-        self.user_agent = ua.to_string();
-    }
-
+    
     pub fn get_user_agent(&self) -> &str {
         return &self.user_agent
     }

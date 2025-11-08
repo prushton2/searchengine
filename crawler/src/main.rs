@@ -1,4 +1,6 @@
 use url::Url;
+use std::sync::{Mutex, Arc};
+use std::thread;
 
 mod robots_txt;
 mod http_request;
@@ -6,13 +8,9 @@ mod request_handler;
 mod parser;
 mod database;
 
-const MAX_CRAWL_DEPTH: i32 = 4;
+// const max_crawl_depth: i32 = 4;
 
 fn main() {
-    crawler_thread(1);
-}
-
-fn crawler_thread(crawler_id: i32) {
     let dbinfo = database::DBInfo{
         host: "localhost".to_string(),
         username: "user".to_string(),
@@ -20,21 +18,43 @@ fn crawler_thread(crawler_id: i32) {
         dbname: "maindb".to_string()
     };
 
-    let mut httprequest: http_request::HTTPRequest = http_request::HTTPRequest::new();
-    httprequest.set_user_agent("search.prushton.com/1.0 (https://github.com/prushton2/searchengine)");
-    let robotstxt: &mut dyn robots_txt::RobotsTXT = &mut robots_txt::RobotsTXTCrate::new(httprequest.clone());
-    let requesthandler: &mut dyn request_handler::RequestHandler = &mut request_handler::SimpleRequestHandler::new(robotstxt, &httprequest);
-    let database: &mut dyn database::Database = &mut database::PostgresDatabase::new(&dbinfo);
+    let httprequest: http_request::HTTPRequest = http_request::HTTPRequest::new("search.prushton.com/1.0 (https://github.com/prushton2/searchengine)");
 
+    let mut database: Box<dyn database::Database + Send> = Box::new(database::PostgresDatabase::new(&dbinfo));
+    
     let _ = database.set_schema();
 
     if database.urlqueue_count() == 0 {
-        let _ = database.urlqueue_push("https://trentbrownuml.github.io/html/index.html", 0, crawler_id);
+        let _ = database.urlqueue_push("https://trentbrownuml.github.io/html/index.html", 0, 0);
     }
+
+    let arc_mutex_db = Arc::new(Mutex::new(database));
+
+    let mut threads = vec![];
+
+    for i in 1..3 {
+        let arc_db = Arc::clone(&arc_mutex_db);
+        let http_clone = httprequest.clone();
+        threads.push(thread::spawn(move || {
+            crawler_thread(arc_db, http_clone, i, 5);
+        }))
+    }
+
+    for thread in threads {
+        thread.join().unwrap()
+    }
+}
+
+fn crawler_thread(arc_mutex_db: Arc<Mutex<Box<dyn database::Database + Send>>>, httprequest: http_request::HTTPRequest, crawler_id: i32, max_crawl_depth: i32) {
+    
+    let robotstxt: &mut dyn robots_txt::RobotsTXT = &mut robots_txt::RobotsTXTCrate::new(httprequest.clone());
+    let requesthandler: &mut dyn request_handler::RequestHandler = &mut request_handler::SimpleRequestHandler::new(robotstxt, &httprequest);
     
     let mut i = 0;
-    while i < 10 {
+    while i >= 0 {
         i += 1;
+
+        let mut database = arc_mutex_db.lock().unwrap();
 
         let (url, depth) = match database.urlqueue_pop_front(crawler_id) {
             Some(t) => t,
@@ -45,7 +65,7 @@ fn crawler_thread(crawler_id: i32) {
             }
         };
 
-        if depth > MAX_CRAWL_DEPTH {
+        if depth > max_crawl_depth {
             println!("Too Deep");
             continue;
         }
@@ -129,7 +149,7 @@ fn crawler_thread(crawler_id: i32) {
 
             if crawled_url_host == dereferenced_url_object.domain().unwrap() {
                 // has to be nested since we dont want depth above max being put on the queue
-                if depth + 1 <= MAX_CRAWL_DEPTH {
+                if depth + 1 <= max_crawl_depth {
                     // add the url to the queue, and set the id of the crawler responsible for it. One crawler for one domain at a time, this makes it easier to respect the crawl_delay (still need to do)
                     let _ = database.urlqueue_push(crawled_url.as_str(), depth+1, crawler_id);
                 }
@@ -146,6 +166,8 @@ fn crawler_thread(crawler_id: i32) {
                 continue; 
             }
         }
+
+        drop(database);
 
         std::thread::sleep(std::time::Duration::from_secs(5));
     }
