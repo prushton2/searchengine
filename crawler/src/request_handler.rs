@@ -10,14 +10,15 @@ pub trait RequestHandler<'a, 'b> {
 #[derive(Debug)]
 pub enum RequestHandlerError {
     BadURL,
+    DisallowedByRobotsTxt,
     HTTPRequestError(http_request::HTTPRequestError)
 }
 
 
 pub struct SimpleRequestHandler<'a, 'b> {
-    robotstxt: &'a dyn robots_txt::RobotsTXT,
+    robotstxt: &'a mut dyn robots_txt::RobotsTXT,
     http_request: &'b http_request::HTTPRequest,
-    current_Url: String
+    current_domain: String
 }
 
 impl<'a, 'b> RequestHandler<'a, 'b> for SimpleRequestHandler<'a, 'b> {
@@ -27,6 +28,27 @@ impl<'a, 'b> RequestHandler<'a, 'b> for SimpleRequestHandler<'a, 'b> {
             Err(_) => return Err(RequestHandlerError::BadURL)
         };
         Self::filter_url(&mut url_object);
+
+        if self.current_domain != Self::convert_url_to_domain(&url_object) {
+            // try 3 times. if we failed all 3, the match will guaranteed fail
+            println!("Updating robots.txt from {} to {}", self.current_domain, url_object.as_str());
+            for _ in 0..3 {
+                match self.robotstxt.fetch_new_robots_txt(url_object.as_str()) {
+                    Ok(_) => {
+                        self.current_domain = Self::convert_url_to_domain(&url_object);
+                        break;
+                    },
+                    Err(_) => {
+                        println!("Failed, retrying...");
+                        continue
+                    }
+                }
+            }
+        }
+
+        if !self.robotstxt.allows_url(&url) {
+            return Err(RequestHandlerError::DisallowedByRobotsTxt)
+        }
 
         let page_content: Vec<u8>;
         let new_url: String;
@@ -46,11 +68,11 @@ impl<'a, 'b> RequestHandler<'a, 'b> for SimpleRequestHandler<'a, 'b> {
 }
 
 impl<'a, 'b> SimpleRequestHandler<'a, 'b> {
-    pub fn new(robotstxt: &'a dyn robots_txt::RobotsTXT, http_request_object: &'b http_request::HTTPRequest) -> Self {
+    pub fn new(robotstxt: &'a mut dyn robots_txt::RobotsTXT, http_request_object: &'b http_request::HTTPRequest) -> Self {
         return SimpleRequestHandler {
             robotstxt: robotstxt,
             http_request: http_request_object,
-            current_Url: String::from("")
+            current_domain: String::from("")
         }
     }
     fn filter_url(url: &mut url::Url) {
@@ -59,10 +81,10 @@ impl<'a, 'b> SimpleRequestHandler<'a, 'b> {
         let _ = url.set_scheme("http");
     }
 
-    fn convert_url_to_domain(url: &url::Url) -> url::Url {
+    fn convert_url_to_domain(url: &url::Url) -> String {
         let mut converted_url = url.clone();
         Self::filter_url(&mut converted_url);
         converted_url.set_path("");
-        return converted_url;
+        return converted_url.as_str().to_owned()
     }
 }

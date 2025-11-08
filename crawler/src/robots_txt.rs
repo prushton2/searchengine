@@ -27,7 +27,10 @@ impl RobotsTXT for RobotsTXTCrate {
                 self.content = self.fetch_robots_txt(&t); 
                 Ok(String::from("Ok"))
             }
-            Err(t) => Err(t.to_string())
+            Err(t) => {
+                self.content = String::from("");
+                Err(t.to_string())
+            }
         }
     }
 }
