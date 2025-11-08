@@ -13,6 +13,7 @@ pub trait Database {
 }
 
 #[allow(dead_code)]
+#[derive(Debug)]
 pub enum Error {
     SQLError(Option<SqlState>)
 }
@@ -20,6 +21,7 @@ pub enum Error {
 pub enum UsedUrlStatus {
     NewUrl,
     UrlDoesntExist,
+    URLExists,
     CannotCrawlUrl,
     CanCrawlUrl
 }
@@ -64,7 +66,7 @@ impl Database for PostgresDatabase {
                 word varchar(64),
                 count integer,
 
-                PRIMARY KEY (url, word)
+                PRIMARY KEY (url, word, parent)
             );
 
             CREATE TABLE IF NOT EXISTS URLQueue (
@@ -124,7 +126,7 @@ impl Database for PostgresDatabase {
             &[&urls, &parents, &words, &counts]
         ) {
             Ok(_) => {},
-            Err(t) => panic!("Error writing to database: {}", t)
+            Err(t) => return Err(Error::SQLError(t.code().cloned()))
         };
         /*  
             This is at the end because i cant be bothered to lock the db
@@ -141,7 +143,7 @@ impl Database for PostgresDatabase {
             &[&url, &page.title, &page.description]
         ) {
             Ok(_) => {},
-            Err(t) => panic!("Error writing to database: {}", t)
+            Err(t) => return Err(Error::SQLError(t.code().cloned()))
         };
         return Ok(())
     }
@@ -224,8 +226,7 @@ impl Database for PostgresDatabase {
             &[&url, &(oneweek as i64)]
         ) {
             Ok(t) => t,
-            // also bad yes i am aware
-            Err(t) => {println!("crawledurls_status: {:?}", t); return UsedUrlStatus::NewUrl}
+            Err(_) => {return UsedUrlStatus::URLExists}
         };
 
         return UsedUrlStatus::NewUrl

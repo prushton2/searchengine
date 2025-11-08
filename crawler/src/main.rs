@@ -32,45 +32,63 @@ fn crawler_thread(crawler_id: i32) {
         let _ = database.urlqueue_push("https://trentbrownuml.github.io/html/index.html", 0, crawler_id);
     }
     
-    let mut limit = 0;
-    while limit < 3 {
-        limit += 1;
+    let mut i = 0;
+    while i < 10 {
+        i += 1;
 
         let (url, depth) = match database.urlqueue_pop_front(crawler_id) {
             Some(t) => t,
             None => { 
+                println!("No URLs");
                 std::thread::sleep(std::time::Duration::from_secs(5));
                 continue;
             }
         };
 
         if depth > MAX_CRAWL_DEPTH {
+            println!("Too Deep");
             continue;
         }
 
         let page_content: Vec<u8>;
         let dereferenced_url: String;
-
+        
         match requesthandler.fetch(&url) {
             Ok(t) => {
                 page_content = t.0;
                 dereferenced_url = t.1;
-                println!("Fetched {}; Dereferenced to {}", &url, dereferenced_url);
+                println!("Fetched {}", dereferenced_url);
             }
             Err(t) => {
                 println!("Error fetching URL {:?}", t);
                 continue;
             },
         }
+
+        // in normal circumstances this wouldnt run, but just incase
+        match database.crawledurls_add(&dereferenced_url) {
+            database::UsedUrlStatus::NewUrl => {},
+            database::UsedUrlStatus::URLExists => {
+                println!("URL Already crawled: {}", dereferenced_url);
+                continue;
+            },
+            _ => {}
+        }
         
         let parsed_content: parser::ParsedData = match parser::parse_html(page_content, &dereferenced_url) {
             Ok(t) => t,
-            Err(_) => { continue }
+            Err(t) => { 
+                println!("Bad parse: {:?}", t);
+                continue
+            }
         };
 
         let dereferenced_url_object = match Url::parse(&dereferenced_url) {
             Ok(t) => t,
-            Err(_) => { continue }
+            Err(_) => { 
+                println!("Failed to convert dereferenced url to url object");
+                continue;
+            }
         };
 
         for raw_crawled_url in &parsed_content.urls {
@@ -99,6 +117,7 @@ fn crawler_thread(crawler_id: i32) {
             };
 
             if crawled_url.scheme() != "https" && crawled_url.scheme() != "http" {
+                println!("Invalid schema on {}", raw_crawled_url);
                 continue;
             }
 
@@ -122,11 +141,11 @@ fn crawler_thread(crawler_id: i32) {
 
         match database.write_crawled_page(&parsed_content, &dereferenced_url) {
             Ok(_) => {},
-            Err(_) => { continue; }
+            Err(t) => { 
+                println!("Couldnt write page to db {:?}", t);
+                continue; 
+            }
         }
-
-        let _ = database.crawledurls_add(&dereferenced_url);
-
 
         std::thread::sleep(std::time::Duration::from_secs(5));
     }
