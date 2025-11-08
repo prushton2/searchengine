@@ -6,7 +6,6 @@ use crate::http_request;
 // Handles interfacing with robots.txt
     
 pub trait RobotsTXT {
-    fn new(request_object: http_request::HTTPRequest) -> Self where Self: Sized;
     fn allows_url(&self, url: &str) -> bool;
     fn fetch_new_robots_txt(&mut self, url: &str) -> Result<String, String>;
 }
@@ -17,13 +16,6 @@ pub struct RobotsTXTCrate {
 }
 
 impl RobotsTXT for RobotsTXTCrate {
-    fn new(request_object: http_request::HTTPRequest) -> Self {
-        RobotsTXTCrate{
-            content: String::from(""),
-            request_object: request_object,
-        }
-    }
-
     fn allows_url(&self, url: &str) -> bool {
         let mut matcher = DefaultMatcher::default();
         return matcher.one_agent_allowed_by_robots(&self.content, &self.request_object.get_user_agent(), url)
@@ -41,6 +33,13 @@ impl RobotsTXT for RobotsTXTCrate {
 }
 
 impl RobotsTXTCrate {
+    pub fn new(request_object: http_request::HTTPRequest) -> Self {
+        return RobotsTXTCrate{
+            content: String::from(""),
+            request_object: request_object,
+        }
+    }
+    
     fn fetch_robots_txt(&self, url_object: &url::Url) -> String {
         let mut robots_path = url_object.clone();
         robots_path.set_path("/robots.txt");

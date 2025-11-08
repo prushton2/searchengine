@@ -1,10 +1,12 @@
 // Handles making http requests. This is lower level than request_handler, as this module works around 3XX 
 // codes and UA
 
+#[derive(Clone)]
 pub struct HTTPRequest {
     user_agent: String
 }
 
+#[derive(Debug)]
 pub enum HTTPRequestError {
     FailedToFetchURL,
     FailedToRedirect(String),
@@ -15,6 +17,12 @@ pub enum HTTPRequestError {
 }
 
 impl HTTPRequest {
+    pub fn new() -> Self {
+        return HTTPRequest{
+            user_agent: "Undefined UA".to_string()
+        }
+    }
+
     pub fn set_user_agent(&mut self, ua: &str) {
         self.user_agent = ua.to_string();
     }
