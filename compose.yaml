@@ -1,52 +1,52 @@
 services:
-  crawler:
-    build: crawler
-    restart: always
+  # crawler:
+  #   build: crawler
+  #   restart: always
   
-    depends_on:
-      db:
-        condition: service_healthy
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
 
-    env_file:
-      - .env
+  #   env_file:
+  #     - .env
 
-  indexer:
-    build: indexer
-    restart: always
+  # indexer:
+  #   build: indexer
+  #   restart: always
 
-    depends_on:
-      db:   
-        condition: service_healthy
+  #   depends_on:
+  #     db:   
+  #       condition: service_healthy
 
-    env_file:
-      - .env
+  #   env_file:
+  #     - .env
 
-  backend:
-    build: backend
-    restart: always
+  # backend:
+  #   build: backend
+  #   restart: always
 
-    env_file:
-      - .env
+  #   env_file:
+  #     - .env
 
-    ports:
-      - ${BACKEND_PORT}:3333
-    depends_on:
-      db:
-        condition: service_healthy
+  #   ports:
+  #     - ${BACKEND_PORT}:3333
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
 
-  frontend:
-    build: 
-      context: frontend
-      args:
-        - VITE_BACKEND_URL=${VITE_BACKEND_URL}
+  # frontend:
+  #   build: 
+  #     context: frontend
+  #     args:
+  #       - VITE_BACKEND_URL=${VITE_BACKEND_URL}
 
-    restart: always
+  #   restart: always
 
-    ports:
-      - ${FRONTEND_PORT}:80
-    depends_on:
-      db:
-        condition: service_healthy
+  #   ports:
+  #     - ${FRONTEND_PORT}:80
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
 
   db:
     image: postgres:16

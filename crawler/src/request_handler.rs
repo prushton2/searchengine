@@ -7,6 +7,7 @@ pub trait RequestHandler<'a, 'b> {
     fn fetch(&mut self, url: &str) -> Result<(Vec<u8>, String), RequestHandlerError>;
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum RequestHandlerError {
     BadURL,

@@ -1,16 +1,19 @@
-use scraper::{Html, Selector, ElementRef, Element};
+use scraper::{Html, Selector};
 use std::str;
 use regex::Regex;
+use std::collections::HashMap;
 
 pub struct ParsedData {
-    words: Vec<Word>,
-    urls: Vec<String>
+    pub description: String,
+    pub title: String,
+    pub words: Vec<Word>,
+    pub urls: Vec<String>
 }
 
 pub struct Word {
-    word: String,
-    parent: String,
-    count: i32
+    pub word: String,
+    pub parent: String,
+    pub count: i32
 }
 
 #[derive(Debug)]
@@ -18,8 +21,10 @@ pub enum ParseHTMLError {
     TextDecodeFailed
 }
 
-pub fn parse_html(content: Vec<u8>, url: String) -> Result<ParsedData, ParseHTMLError> {
-    let parsedData = ParsedData {
+pub fn parse_html(content: Vec<u8>, _url: &String) -> Result<ParsedData, ParseHTMLError> {
+    let mut parsed_data = ParsedData {
+        title: "".to_string(),
+        description: "".to_string(),
         words: vec![],
         urls: vec![]
     };
@@ -35,17 +40,69 @@ pub fn parse_html(content: Vec<u8>, url: String) -> Result<ParsedData, ParseHTML
     let link_selector = Selector::parse("a").unwrap();
     let body_selector = Selector::parse("body").unwrap();
 
+    let mut wordmap: HashMap<(String, String), i32> = [].into();
 
     for element in document.select(&body_selector) {
         for child in element.descendent_elements() {
-            if remove_child_html(&child.inner_html()).len() != 0 {
-                println!("{}: {}\n", child.value().name(), remove_child_html(&child.inner_html()));
+            let parent_node = child.value().name();
+            let child_text = remove_child_html(&child.inner_html());
+
+            if child_text.len() == 0 { continue };
+            let cleaned = clean_text(&child_text);
+            let parts = cleaned.split(" ");
+            
+            for word in parts {
+                if word.len() == 0 { continue; }
+
+                match wordmap.insert((parent_node.to_string(), word.to_string()), 1) {
+                    Some(n) => {wordmap.insert((parent_node.to_string(), word.to_string()), n+1);},
+                    None => {}
+                }
             }
         }
     }
 
-    return Ok(parsedData)
+    for element in document.select(&title_selector) {
+        for text in element.text() {
+            parsed_data.title = text.to_string();
+            if text.len() == 0 { continue };
+            let cleaned = clean_text(&text);
+            let parts = cleaned.split(" ");
 
+            for word in parts {
+                if word.len() == 0 {
+                    continue;
+                }
+
+                match wordmap.insert(("title".to_string(), word.to_string()), 1) {
+                    Some(n) => {wordmap.insert(("title".to_string(), word.to_string()), n+1);},
+                    None => {}
+                }
+            }
+        }
+    }
+
+    for element in document.select(&link_selector) {
+        let link = match element.attr("href") {
+            Some(url) => url,
+            None => ""
+        };
+        if link == "" { continue; }
+
+        parsed_data.urls.push(String::from(link))
+    }
+
+    for ((parent, word), count) in wordmap.iter() {
+        parsed_data.words.push(
+            Word{
+                word: word.clone(),
+                parent: parent.clone(),
+                count: *count
+            }
+        );
+    }
+
+    return Ok(parsed_data)
 }
 
 fn remove_child_html(html: &String) -> String {
@@ -55,7 +112,6 @@ fn remove_child_html(html: &String) -> String {
     let trimmed = cleaned.trim();
 
     // Remove any remaining tags (<br>, <img>, etc..)
-
     if trimmed.chars().nth(0) == Some('<') && trimmed.chars().last() == Some('>') {
         return String::from("");
     }
@@ -65,4 +121,10 @@ fn remove_child_html(html: &String) -> String {
     let trimmed = cleaned.trim();
 
     return trimmed.to_owned();
+}
+
+fn clean_text(text: &str) -> String {
+    let remove_non_alphanumeric = Regex::new(r"[^a-zA-Z\d\s:]|[\r\n]").unwrap();
+    let cleaned = remove_non_alphanumeric.replace_all(&text, " ").to_lowercase();
+    return cleaned;
 }

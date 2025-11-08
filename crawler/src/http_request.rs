@@ -6,6 +6,7 @@ pub struct HTTPRequest {
     user_agent: String
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum HTTPRequestError {
     FailedToFetchURL,

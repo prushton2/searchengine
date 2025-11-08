@@ -4,7 +4,7 @@ use std::str;
 
 use crate::http_request;
 // Handles interfacing with robots.txt
-    
+
 pub trait RobotsTXT {
     fn allows_url(&self, url: &str) -> bool;
     fn fetch_new_robots_txt(&mut self, url: &str) -> Result<String, String>;
