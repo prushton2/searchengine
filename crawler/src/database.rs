@@ -1,3 +1,8 @@
+// Database trait should implement the following features:
+// Queue for urls storing url, depth, and crawler id. 0 refers to no assigned crawler
+// crawled words, storing the word, its parent element, the count, and the url
+// crawled data, storing the url, title, and a 512 character description
+
 use std::time::SystemTime;
 use postgres::{Client, NoTls, error::SqlState};
 use crate::parser;

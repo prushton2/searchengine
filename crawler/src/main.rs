@@ -50,18 +50,18 @@ fn crawler_thread(arc_mutex_db: Arc<Mutex<Box<dyn database::Database + Send>>>, 
     let robotstxt: &mut dyn robots_txt::RobotsTXT = &mut robots_txt::RobotsTXTCrate::new(httprequest.clone());
     let requesthandler: &mut dyn request_handler::RequestHandler = &mut request_handler::SimpleRequestHandler::new(robotstxt, &httprequest);
     
-    let mut i = 0;
-    while i >= 0 {
-        i += 1;
+    loop {
 
-        let mut database = arc_mutex_db.lock().unwrap();
+        let (url, depth) = {
+            let mut database = arc_mutex_db.lock().unwrap();
 
-        let (url, depth) = match database.urlqueue_pop_front(crawler_id) {
-            Some(t) => t,
-            None => { 
-                println!("No URLs");
-                std::thread::sleep(std::time::Duration::from_secs(5));
-                continue;
+            match database.urlqueue_pop_front(crawler_id) {
+                Some(t) => t,
+                None => { 
+                    println!("No URLs");
+                    std::thread::sleep(std::time::Duration::from_secs(5));
+                    continue;
+                }
             }
         };
 
@@ -87,6 +87,7 @@ fn crawler_thread(arc_mutex_db: Arc<Mutex<Box<dyn database::Database + Send>>>, 
 
         // in normal circumstances this wouldnt run, but just incase
         // there is an edge case where a url may not lose its qstring and fragment, causing it to be re queried
+        let mut database = arc_mutex_db.lock().unwrap();
         match database.crawledurls_add(&dereferenced_url) {
             database::UsedUrlStatus::NewUrl => {},
             database::UsedUrlStatus::URLExists => {

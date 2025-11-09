@@ -1,3 +1,5 @@
+// The parser doesnt implement an interface as it doesnt need state. Its job is to take raw bytes, and spit out some data regarding the content
+
 use scraper::{Html, Selector};
 use std::str;
 use regex::Regex;

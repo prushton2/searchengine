@@ -1,9 +1,13 @@
+// Handles interfacing with robots.txt.
+// fetch_new_robots_txt should store the content of robots.txt in the struct
+// allows_url should read the robots.txt content and the user agent from the struct
+
+
 use robotstxt::DefaultMatcher;
 use url::Url;
 use std::str;
 
 use crate::http_request;
-// Handles interfacing with robots.txt
 
 pub trait RobotsTXT {
     fn allows_url(&self, url: &str) -> bool;

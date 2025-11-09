@@ -1,5 +1,4 @@
-// Handles making http requests. This is lower level than request_handler, as this module works around 3XX 
-// codes and UA
+// Handles making http requests. This is lower level than request_handler, with the intention of working around things like 3XX and content-language 
 
 #[derive(Clone)]
 pub struct HTTPRequest {

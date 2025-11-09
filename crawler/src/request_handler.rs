@@ -1,3 +1,6 @@
+// This is a high level request handler, whose job is to make http requests and return the dereferenced url and the byte vector content
+// It is expected to manage robots.txt, and dereference 3XX urls
+
 use crate::robots_txt;
 use crate::http_request;
 
@@ -14,7 +17,6 @@ pub enum RequestHandlerError {
     DisallowedByRobotsTxt,
     HTTPRequestError(http_request::HTTPRequestError)
 }
-
 
 pub struct SimpleRequestHandler<'a, 'b> {
     robotstxt: &'a mut dyn robots_txt::RobotsTXT,
