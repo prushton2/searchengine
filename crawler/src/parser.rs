@@ -64,6 +64,14 @@ pub fn parse_html(content: Vec<u8>, _url: &String) -> Result<ParsedData, ParseHT
         }
     }
 
+    for element in document.select(&body_selector) {
+        let text = element.text().collect::<Vec<_>>().join(" ");
+        if !text.is_empty() {
+            parsed_data.description = text.chars().take(512).collect::<String>();
+            break;
+        }
+    }
+
     for element in document.select(&title_selector) {
         for text in element.text() {
             parsed_data.title = text.to_string();

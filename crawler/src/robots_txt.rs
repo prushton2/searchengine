@@ -52,15 +52,19 @@ impl RobotsTXTCrate {
         robots_path.set_path("/robots.txt");
         robots_path.set_query(None);
         robots_path.set_fragment(None);
+
+        // println!("robotstxt url: {}", robots_path.as_str());
         
         let robots_bytes: Vec<u8> = match self.request_object.request(robots_path.as_str()) {
             Ok(t) => t.0,
-            Err(_) => "user-agent: *\ndisallow: /".as_bytes().to_owned()
+            Err(_) => vec![]
         };
+
+        // println!("robots bytes: {}", robots_bytes.len());
         
         return match str::from_utf8(&robots_bytes) {
             Ok(t) => t.to_string(),
-            Err(_) => "user-agent: *\ndisallow: /".into(),
+            Err(_) => "".into(),
         };
     }
 
@@ -71,7 +75,8 @@ impl RobotsTXTCrate {
             request_object: http_request::HTTPRequest::new("")
         }
     }
-
+    
+    #[allow(dead_code)]
     fn test_set_content(&mut self, content: &str) {
         self.content = content.to_string();
     }
@@ -93,5 +98,11 @@ mod tests {
         assert_eq!(robotstxtcrate.allows_url("http://example.com/"), true);
         assert_eq!(robotstxtcrate.allows_url("http://example.com/test"), false);
         assert_eq!(robotstxtcrate.allows_url("http://example.com/test/url"), false);
+
+        robotstxtcrate.test_set_content("");
+
+        assert_eq!(robotstxtcrate.allows_url("http://example.com/"), true);
+        assert_eq!(robotstxtcrate.allows_url("http://example.com/test"), true);
+        assert_eq!(robotstxtcrate.allows_url("http://example.com/test/url"), true);
     }
 }

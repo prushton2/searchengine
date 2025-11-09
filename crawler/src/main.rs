@@ -25,14 +25,14 @@ fn main() {
     let _ = database.set_schema();
 
     if database.urlqueue_count() == 0 {
-        let _ = database.urlqueue_push("http://reddit.com/", 0, 0);
+        let _ = database.urlqueue_push("https://trentbrownuml.github.io/html/index.html", 0, 0);
     }
 
     let arc_mutex_db = Arc::new(Mutex::new(database));
 
     let mut threads = vec![];
 
-    for i in 1..2 {
+    for i in 1..5 {
         let arc_db = Arc::clone(&arc_mutex_db);
         let http_clone = httprequest.clone();
         threads.push(thread::spawn(move || {

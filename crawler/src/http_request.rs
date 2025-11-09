@@ -63,7 +63,7 @@ impl HTTPRequest {
             return Err(HTTPRequestError::MissingHeader("content-type".to_string()))
         }
 
-        if !content_type.to_str().unwrap().contains("text/html") {
+        if !content_type.to_str().unwrap().contains("text/html") && !content_type.to_str().unwrap().contains("text/plain"){
             return Err(HTTPRequestError::BadHeaderValue("content-type".to_string(), content_type.to_str().unwrap_or("[invalid UTF-8]").to_string()))
         }
 
