@@ -25,14 +25,14 @@ fn main() {
     let _ = database.set_schema();
 
     if database.urlqueue_count() == 0 {
-        let _ = database.urlqueue_push("https://trentbrownuml.github.io/html/index.html", 0, 0);
+        let _ = database.urlqueue_push("http://reddit.com/", 0, 0);
     }
 
     let arc_mutex_db = Arc::new(Mutex::new(database));
 
     let mut threads = vec![];
 
-    for i in 1..3 {
+    for i in 1..2 {
         let arc_db = Arc::clone(&arc_mutex_db);
         let http_clone = httprequest.clone();
         threads.push(thread::spawn(move || {
@@ -80,12 +80,13 @@ fn crawler_thread(arc_mutex_db: Arc<Mutex<Box<dyn database::Database + Send>>>, 
                 println!("Fetched {}", dereferenced_url);
             }
             Err(t) => {
-                println!("Error fetching URL {:?}", t);
+                println!("Error fetching URL {}: {:?}", url, t);
                 continue;
             },
         }
 
         // in normal circumstances this wouldnt run, but just incase
+        // there is an edge case where a url may not lose its qstring and fragment, causing it to be re queried
         match database.crawledurls_add(&dereferenced_url) {
             database::UsedUrlStatus::NewUrl => {},
             database::UsedUrlStatus::URLExists => {

@@ -51,12 +51,43 @@ impl RobotsTXTCrate {
         
         let robots_bytes: Vec<u8> = match self.request_object.request(robots_path.as_str()) {
             Ok(t) => t.0,
-            Err(_) => "user-agent: *\ndisallow:".as_bytes().to_owned()
+            Err(_) => "user-agent: *\ndisallow: /".as_bytes().to_owned()
         };
         
         return match str::from_utf8(&robots_bytes) {
             Ok(t) => t.to_string(),
-            Err(_) => "user-agent: *\ndisallow:".into(),
+            Err(_) => "user-agent: *\ndisallow: /".into(),
         };
+    }
+
+    #[allow(dead_code)]
+    fn test_init(content: &str) -> Self {
+        return RobotsTXTCrate {
+            content: content.to_string(),
+            request_object: http_request::HTTPRequest::new("")
+        }
+    }
+
+    fn test_set_content(&mut self, content: &str) {
+        self.content = content.to_string();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn robotstxtcrate_allow() {
+        let mut robotstxtcrate = RobotsTXTCrate::test_init("User-agent: *\nDisallow: /");
+        assert_eq!(robotstxtcrate.allows_url("http://example.com/"), false);
+        assert_eq!(robotstxtcrate.allows_url("http://example.com/test"), false);
+        assert_eq!(robotstxtcrate.allows_url("http://example.com/test/url"), false);
+
+        robotstxtcrate.test_set_content("User-agent: *\nDisallow: /test");
+
+        assert_eq!(robotstxtcrate.allows_url("http://example.com/"), true);
+        assert_eq!(robotstxtcrate.allows_url("http://example.com/test"), false);
+        assert_eq!(robotstxtcrate.allows_url("http://example.com/test/url"), false);
     }
 }

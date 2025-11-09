@@ -76,6 +76,7 @@ impl<'a, 'b> SimpleRequestHandler<'a, 'b> {
             current_domain: String::from("")
         }
     }
+
     fn filter_url(url: &mut url::Url) {
         url.set_fragment(None);
         url.set_query(None);
