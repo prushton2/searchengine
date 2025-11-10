@@ -72,9 +72,11 @@ fn crawler_thread(arc_mutex_db: Arc<Mutex<Box<dyn database::Database + Send>>>, 
                     t
                 },
                 None => {
+                    if database.urlqueue_count() == 0 {
+                        no_urls_count += 1;
+                        warn!("{}  | No URLs in queue ({}/5)", crawler_id, no_urls_count);
+                    }
                     drop(database);
-                    no_urls_count += 1;
-                    warn!("{}  | No URLs in queue ({}/5)", crawler_id, no_urls_count);
                     std::thread::sleep(std::time::Duration::from_secs(5));
                     continue;
                 }
@@ -149,13 +151,13 @@ fn crawler_thread(arc_mutex_db: Arc<Mutex<Box<dyn database::Database + Send>>>, 
                 }
             };
 
-            match database.crawledurls_status(raw_crawled_url) {
+            match database.crawledurls_status(crawled_url.as_str()) {
                 database::UsedUrlStatus::CannotCrawlUrl => {continue;}
                 _ => {}
             };
 
             if crawled_url.scheme() != "https" && crawled_url.scheme() != "http" {
-                debug!("Invalid schema on {}", raw_crawled_url);
+                debug!("Invalid schema on {}", crawled_url.as_str());
                 continue;
             }
 
