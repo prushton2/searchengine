@@ -159,32 +159,25 @@ impl Database for PostgresDatabase {
 
     fn urlqueue_pop_front(self: &mut Self, crawler_id: i32) -> Option<(String, i32)> {
         // get a url owned by the callee
-        let row = match self.client.query_one(
-            "SELECT * FROM urlqueue WHERE crawler_id=$1 LIMIT 1",
+        match self.client.query_one(
+            "DELETE FROM urlqueue WHERE url = (
+                SELECT url FROM urlqueue
+                WHERE crawler_id=$1 OR crawler_id=0
+                ORDER BY crawler_id DESC LIMIT 1
+            ) RETURNING url, depth",
             &[&crawler_id]
         ) {
-            Ok(t) => t,
+            Ok(t) => {
+                let data: (String, i32) = (
+                    t.get::<&str, String>("url"), 
+                    t.get::<&str, i32>("depth")
+                );
+                return Some(data)
+            },
+
             // if fails, get an unowned url
-            Err(_) => match self.client.query_one(
-                "SELECT * FROM urlqueue WHERE crawler_id=0 LIMIT 1",
-                &[]
-            ) {
-                Ok(t) => t,
-                Err(_) => return None
-            }
-        };
-
-        let data: (String, i32) = (
-            row.get::<&str, String>("url"), 
-            row.get::<&str, i32>("depth")
-        );
-
-        let _ = self.client.execute(
-            "DELETE FROM urlqueue WHERE url = $1",
-            &[&data.0]
-        );
-
-        return Some(data)
+            Err(_) => return None
+        }
     }
 
     fn urlqueue_push(self: &mut Self, url: &str, depth: i32, crawler_id: i32) -> Result<String, String> {
