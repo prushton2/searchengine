@@ -1,0 +1,10 @@
+crawler:
+  crawler_threads: 2
+  max_crawl_depth: 3
+  user_agent: "search.prushton.com/1.0 (https://github.com/prushton2/searchengine)"
+  seed_url: "https://wikipedia.org"
+database:
+  host: "localhost"
+  username: "user"
+  password: "password"
+  dbname: "maindb"

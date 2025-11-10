@@ -6,6 +6,7 @@
 use std::time::SystemTime;
 use postgres::{Client, NoTls, error::SqlState};
 use crate::parser;
+use crate::config::PostgresDBInfo;
 
 pub trait Database {
     fn set_schema(self: &mut Self) -> Result<(), Error>;
@@ -35,16 +36,8 @@ pub struct PostgresDatabase {
     client: Client
 }
 
-pub struct DBInfo {
-    pub host: String,
-    pub username: String,
-    pub password: String,
-    pub dbname: String
-}
-
-
 impl PostgresDatabase {
-    pub fn new(dbinfo: &DBInfo) -> Self {
+    pub fn new(dbinfo: &PostgresDBInfo) -> Self {
         let string: String = format!("host={} user={} password={} dbname={}", dbinfo.host, dbinfo.username, dbinfo.password, dbinfo.dbname);
         let new_client = Client::connect(&string, NoTls).unwrap();
 

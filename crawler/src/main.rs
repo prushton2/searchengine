@@ -1,42 +1,36 @@
-use url::Url;
 use std::sync::{Mutex, Arc};
 use std::thread;
+// use log::{trace, debug, info};
+use url::Url;
 
 mod robots_txt;
 mod http_request;
 mod request_handler;
 mod parser;
 mod database;
-
-// const max_crawl_depth: i32 = 4;
+mod config;
 
 fn main() {
-    let dbinfo = database::DBInfo{
-        host: "localhost".to_string(),
-        username: "user".to_string(),
-        password: "password".to_string(),
-        dbname: "maindb".to_string()
-    };
-
-    let httprequest: http_request::HTTPRequest = http_request::HTTPRequest::new("search.prushton.com/1.0 (https://github.com/prushton2/searchengine)");
-
-    let mut database: Box<dyn database::Database + Send> = Box::new(database::PostgresDatabase::new(&dbinfo));
+    let config = config::Config::read_from_file("../config.yaml");
+    
+    let httprequest: http_request::HTTPRequest = http_request::HTTPRequest::new(&config.crawler.user_agent);
+    let mut database: Box<dyn database::Database + Send> = Box::new(database::PostgresDatabase::new(&config.database));
     
     let _ = database.set_schema();
 
     if database.urlqueue_count() == 0 {
-        let _ = database.urlqueue_push("https://trentbrownuml.github.io/html/index.html", 0, 0);
+        let _ = database.urlqueue_push(&config.crawler.seed_url, 0, 0);
     }
 
     let arc_mutex_db = Arc::new(Mutex::new(database));
 
     let mut threads = vec![];
 
-    for i in 1..5 {
+    for i in 1..config.crawler.crawler_threads+1 {
         let arc_db = Arc::clone(&arc_mutex_db);
         let http_clone = httprequest.clone();
         threads.push(thread::spawn(move || {
-            crawler_thread(arc_db, http_clone, i, 5);
+            crawler_thread(arc_db, http_clone, i, config.crawler.max_crawl_depth);
         }))
     }
 
@@ -58,7 +52,7 @@ fn crawler_thread(arc_mutex_db: Arc<Mutex<Box<dyn database::Database + Send>>>, 
             match database.urlqueue_pop_front(crawler_id) {
                 Some(t) => t,
                 None => { 
-                    println!("No URLs");
+                    println!("{}  | No URLs", crawler_id);
                     std::thread::sleep(std::time::Duration::from_secs(5));
                     continue;
                 }
@@ -66,7 +60,7 @@ fn crawler_thread(arc_mutex_db: Arc<Mutex<Box<dyn database::Database + Send>>>, 
         };
 
         if depth > max_crawl_depth {
-            println!("Too Deep");
+            // println!("Too Deep");
             continue;
         }
 
@@ -77,10 +71,10 @@ fn crawler_thread(arc_mutex_db: Arc<Mutex<Box<dyn database::Database + Send>>>, 
             Ok(t) => {
                 page_content = t.0;
                 dereferenced_url = t.1;
-                println!("Fetched {}", dereferenced_url);
+                println!("{}  | Fetched {}", crawler_id, dereferenced_url);
             }
             Err(t) => {
-                println!("Error fetching URL {}: {:?}", url, t);
+                println!("{}  | Error fetching URL {}: {:?}", crawler_id, url, t);
                 continue;
             },
         }

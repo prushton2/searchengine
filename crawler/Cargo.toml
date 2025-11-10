@@ -5,10 +5,13 @@ edition = "2024"
 
 [dependencies]
 dotenv = "0.15.0"
+log = "0.4.28"
 postgres = "0.19.10"
 regex = "1.12.2"
 reqwest = { version="0.12.23", features=["blocking"] }
 robotstxt = "0.3.0"
 scraper = "0.24.0"
+serde = { version="1.0.228", features=["derive"]}
+serde_yaml = "0.9.34"
 tokio = { version="1.47.1", features=["full"] }
 url = "2.5.7"
