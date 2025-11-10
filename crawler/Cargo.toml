@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 dotenv = "0.15.0"
+env_logger = "0.11.8"
 log = "0.4.28"
 postgres = "0.19.10"
 regex = "1.12.2"

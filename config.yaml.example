@@ -3,6 +3,7 @@ crawler:
   max_crawl_depth: 3
   user_agent: "search.prushton.com/1.0 (https://github.com/prushton2/searchengine)"
   seed_url: "https://wikipedia.org"
+  log: "info"
 database:
   host: "localhost"
   username: "user"

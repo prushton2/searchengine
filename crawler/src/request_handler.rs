@@ -6,6 +6,8 @@ use crate::http_request;
 
 use url::Url;
 
+use log::{warn, info};
+
 pub trait RequestHandler<'a, 'b> {
     fn fetch(&mut self, url: &str) -> Result<(Vec<u8>, String), RequestHandlerError>;
 }
@@ -34,7 +36,7 @@ impl<'a, 'b> RequestHandler<'a, 'b> for SimpleRequestHandler<'a, 'b> {
 
         if self.current_domain != Self::convert_url_to_domain(&url_object) {
             // try 3 times. if we failed all 3, the match will guaranteed fail
-            println!("Updating robots.txt from {} to {}", self.current_domain, url_object.as_str());
+            info!("Updating robots.txt from {} to {}", self.current_domain, url_object.as_str());
             for _ in 0..3 {
                 match self.robotstxt.fetch_new_robots_txt(url_object.as_str()) {
                     Ok(_) => {
@@ -42,7 +44,7 @@ impl<'a, 'b> RequestHandler<'a, 'b> for SimpleRequestHandler<'a, 'b> {
                         break;
                     },
                     Err(_) => {
-                        println!("Failed, retrying...");
+                        warn!("Failed to update robotstxt from {} to {}, retrying...", self.current_domain, url_object.as_str());
                         continue
                     }
                 }

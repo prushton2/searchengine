@@ -48,8 +48,6 @@ impl HTTPRequest {
                 None => return Err(HTTPRequestError::FailedToRedirect("Couldnt find location header".to_string()))
             };
 
-            println!("{}", redirect_to);
-
             return self.request(redirect_to);
         }
 
