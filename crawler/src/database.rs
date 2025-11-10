@@ -13,7 +13,7 @@ pub trait Database {
     fn write_crawled_page(self: &mut Self, page: &parser::ParsedData, url: &String) -> Result<(), Error>;
     fn urlqueue_count(self: &mut Self) -> i64;
     fn urlqueue_pop_front(self: &mut Self, crawler_id: i32) -> Option<(String, i32)>;
-    fn urlqueue_push(self: &mut Self, url: &str, depth: i32, crawler_id: i32) -> Result<String, String>;
+    fn urlqueue_push(self: &mut Self, url: &str, depth: i32, crawler_id: i32) -> Result<String, Error>;
     fn crawledurls_status(self: &mut Self, url: &str) -> UsedUrlStatus;
     fn crawledurls_add(self: &mut Self, url: &str) -> UsedUrlStatus;
 }
@@ -180,13 +180,13 @@ impl Database for PostgresDatabase {
         }
     }
 
-    fn urlqueue_push(self: &mut Self, url: &str, depth: i32, crawler_id: i32) -> Result<String, String> {
+    fn urlqueue_push(self: &mut Self, url: &str, depth: i32, crawler_id: i32) -> Result<String, Error> {
         match self.client.execute(
             "INSERT INTO urlqueue VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
             &[&url, &depth, &crawler_id]
         ) {
             Ok(_) => return Ok("Success".to_string()),
-            Err(t) => return Err(format!("Error running urlqueue_push: {}", t))
+            Err(t) => return Err(Error::SQLError(t.code().cloned()))
         };
     }
 
@@ -196,7 +196,6 @@ impl Database for PostgresDatabase {
             &[&url]
         ) {
             Ok(t) => t,
-            // bad i know
             Err(_t) => return UsedUrlStatus::UrlDoesntExist
         };
 
