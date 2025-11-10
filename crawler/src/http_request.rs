@@ -2,7 +2,9 @@
 
 #[derive(Clone)]
 pub struct HTTPRequest {
-    user_agent: String
+    user_agent: String,
+    // max_processing_content_size: u64
+    max_page_size: u64
 }
 
 #[allow(dead_code)]
@@ -14,13 +16,16 @@ pub enum HTTPRequestError {
     BadStatusCode(u16),
     MissingHeader(String),
     BadHeaderValue(String, String),
-    CouldntConvertToBytes
+    CouldntConvertToBytes,
+    ContentLengthTooBig(u64)
 }
 
 impl HTTPRequest {
     pub fn new(ua: &str) -> Self {
         return HTTPRequest{
-            user_agent: ua.to_string()
+            user_agent: ua.to_string(),
+            // max_processing_content_size = 2 * 1024 * 1024; // 2mb
+            max_page_size: 15 * 1024 * 1024 // 15mb
         }
     }
     
@@ -92,7 +97,11 @@ impl HTTPRequest {
             Err(_) => return Err(HTTPRequestError::FailedToHeadURL)
         };
 
-        // loads entire page to memory - size limit?
+        
+        if content.content_length().is_some() && content.content_length().unwrap() > self.max_page_size {
+            return Err(HTTPRequestError::ContentLengthTooBig(content.content_length().unwrap()))
+        }
+
         let bytes = match content.bytes() {
             Ok(t) => t,
             Err(_) => return Err(HTTPRequestError::CouldntConvertToBytes)
