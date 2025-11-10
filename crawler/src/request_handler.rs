@@ -58,7 +58,7 @@ impl<'a, 'b> RequestHandler<'a, 'b> for SimpleRequestHandler<'a, 'b> {
         let page_content: Vec<u8>;
         let new_url: String;
         
-        match self.http_request.request(url_object.as_str()) {
+        match self.http_request.request(url_object.as_str(), None) {
             Ok(t) => {
                 page_content = t.0;
                 new_url = t.1;

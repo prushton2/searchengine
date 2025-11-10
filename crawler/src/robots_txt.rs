@@ -55,7 +55,7 @@ impl RobotsTXTCrate {
 
         // println!("robotstxt url: {}", robots_path.as_str());
         
-        let robots_bytes: Vec<u8> = match self.request_object.request(robots_path.as_str()) {
+        let robots_bytes: Vec<u8> = match self.request_object.request(robots_path.as_str(), None) {
             Ok(t) => t.0,
             Err(_) => vec![]
         };

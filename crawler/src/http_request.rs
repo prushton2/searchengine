@@ -28,7 +28,12 @@ impl HTTPRequest {
         return &self.user_agent
     }
 
-    pub fn request(&self, url: &str) -> Result<(Vec<u8>, String), HTTPRequestError> {
+    pub fn request(&self, url: &str, depth: Option<i32>) -> Result<(Vec<u8>, String), HTTPRequestError> {
+        let current_depth = match depth {
+            Some(t) => t,
+            None => 0
+        };
+
         let client = reqwest::blocking::Client::builder()
             .user_agent(self.user_agent.clone())
             .build()
@@ -39,7 +44,7 @@ impl HTTPRequest {
             Err(_) => return Err(HTTPRequestError::FailedToHeadURL)
         };
 
-        if result.status().is_redirection() {
+        if result.status().is_redirection() && current_depth < 5{
             let redirect_to = match result.headers().get("location") {
                 Some(t) => match t.to_str() {
                     Ok(t) => t,
@@ -48,7 +53,7 @@ impl HTTPRequest {
                 None => return Err(HTTPRequestError::FailedToRedirect("Couldnt find location header".to_string()))
             };
 
-            return self.request(redirect_to);
+            return self.request(redirect_to, Some(current_depth+1));
         }
 
         if result.status().is_client_error() || result.status().is_server_error() {
@@ -87,6 +92,7 @@ impl HTTPRequest {
             Err(_) => return Err(HTTPRequestError::FailedToHeadURL)
         };
 
+        // loads entire page to memory - size limit?
         let bytes = match content.bytes() {
             Ok(t) => t,
             Err(_) => return Err(HTTPRequestError::CouldntConvertToBytes)
