@@ -9,6 +9,7 @@ pub struct HTTPRequest {
 #[derive(Debug)]
 pub enum HTTPRequestError {
     FailedToFetchURL,
+    FailedToHeadURL,
     FailedToRedirect(String),
     BadStatusCode(u16),
     MissingHeader(String),
@@ -33,9 +34,9 @@ impl HTTPRequest {
             .build()
             .unwrap();
     
-        let result = match client.get(url).send() {
+        let result = match client.head(url).send() {
             Ok(t) => t,
-            Err(_) => return Err(HTTPRequestError::FailedToFetchURL)
+            Err(_) => return Err(HTTPRequestError::FailedToHeadURL)
         };
 
         if result.status().is_redirection() {
@@ -46,6 +47,8 @@ impl HTTPRequest {
                 },
                 None => return Err(HTTPRequestError::FailedToRedirect("Couldnt find location header".to_string()))
             };
+
+            println!("{}", redirect_to);
 
             return self.request(redirect_to);
         }
@@ -81,7 +84,12 @@ impl HTTPRequest {
             Err(_) => {}
         };
 
-        let bytes = match result.bytes() {
+        let content = match client.get(url).send() {
+            Ok(t) => t,
+            Err(_) => return Err(HTTPRequestError::FailedToHeadURL)
+        };
+
+        let bytes = match content.bytes() {
             Ok(t) => t,
             Err(_) => return Err(HTTPRequestError::CouldntConvertToBytes)
         };
