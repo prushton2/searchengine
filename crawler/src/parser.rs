@@ -68,6 +68,7 @@ pub fn parse_html(content: Vec<u8>, _url: &String) -> Result<ParsedData, ParseHT
         let text = element.text().collect::<Vec<_>>().join(" ");
         if !text.is_empty() {
             parsed_data.description = text.chars().take(512).collect::<String>();
+            parsed_data.description = parsed_data.description.replace("\n", " ");
             break;
         }
     }
