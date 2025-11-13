@@ -18,16 +18,27 @@ fn main() {
         .init();
 
     let db: &mut dyn database::Database = &mut database::PostgresDatabase::new(&conf.database);
+    // let dict: 
 
-    index(db, &conf);
+    loop {
+        index(db, &conf);
+        std::thread::sleep(std::time::Duration::from_secs(20));
+    }
 }
 
-fn index(db: &mut dyn database::Database, conf: &config::Config) {
+fn index(db: &mut dyn database::Database, _conf: &config::Config) {
     
-    for i in 0..db.crawled_page_len() {
-        let crawled_page = db.get_crawled_page();
-        println!("crawled_page: {:?}\n", crawled_page.unwrap().url);
-        
-    }
+    for _ in 0..db.crawled_page_len() {
+        let crawled = db.get_crawled_page().unwrap();
+        // println!("crawled_page: {:?}\n", crawled_page.unwrap().url);
 
+        let indexed: &mut dyn indexed_page::IndexedPage = &mut indexed_page::BasicIndexedPage::new();
+        indexed.from_crawled_page(crawled);
+        match indexed.consume_into_db(db) {
+            Ok(_) => {},
+            Err(t) => println!("{:?}", t),
+        };
+
+        return
+    }
 }

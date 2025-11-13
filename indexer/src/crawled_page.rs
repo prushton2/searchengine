@@ -1,6 +1,6 @@
 
 #[derive(Debug)]
-pub struct Crawled_page {
+pub struct CrawledPage {
     pub url: String,
     pub description: String,
     pub title: String,

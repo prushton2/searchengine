@@ -5,7 +5,7 @@ use crate::crawled_page;
 use crate::database;
 
 pub trait IndexedPage {
-    fn from_crawled_page(self: &mut Self, page: crawled_page::Crawled_page);
+    fn from_crawled_page(self: &mut Self, page: crawled_page::CrawledPage);
     fn consume_into_db(self: &mut Self, db: &mut dyn database::Database) -> Result<(), database::Error>;
 }
 
@@ -17,7 +17,7 @@ pub struct BasicIndexedPage {
 }
 
 impl IndexedPage for BasicIndexedPage {
-    fn from_crawled_page(self: &mut Self, page: crawled_page::Crawled_page) {
+    fn from_crawled_page(self: &mut Self, page: crawled_page::CrawledPage) {
         self.url = page.url;
         self.title = page.title;
         self.description = page.description;
@@ -32,8 +32,7 @@ impl IndexedPage for BasicIndexedPage {
             Ok(_) => {}
             Err(t) => return Err(t)
         };
-        return Ok(());
-        match db.write_indexed_words(&self.url, &mut self.words.into_iter()) {
+        match db.write_indexed_words(&self.url, &mut self.words.clone().into_iter()) {
             Ok(_) => return Ok(()),
             Err(t) => return Err(t)
         };
@@ -41,7 +40,7 @@ impl IndexedPage for BasicIndexedPage {
 }
 
 impl BasicIndexedPage {
-    fn new() -> Self {
+    pub fn new() -> Self {
         return BasicIndexedPage {
             url: String::from(""),
             title: String::from(""),
