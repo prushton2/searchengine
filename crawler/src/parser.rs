@@ -47,8 +47,10 @@ pub fn parse_html(content: Vec<u8>, _url: &String) -> Result<ParsedData, ParseHT
     for element in document.select(&body_selector) {
         for child in element.descendent_elements() {
             let parent_node = child.value().name();
-            let child_text = remove_child_html(&child.inner_html());
 
+            // idea is to get the text inside an element, not the html, and store the text alongside its parent element
+            let child_text = remove_child_html(&child.inner_html());
+            
             if child_text.len() == 0 { continue };
             let cleaned = clean_text(&child_text);
             let parts = cleaned.split(" ");

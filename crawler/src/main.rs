@@ -40,6 +40,7 @@ fn main() {
 
     let mut threads = vec![];
 
+    // I start at 1 because a url with a crawler id 0 in the database means it unassigned to a crawler
     for i in 1..config.crawler.crawler_threads+1 {
         let arc_db = Arc::clone(&arc_mutex_db);
         let http_clone = httprequest.clone();
@@ -52,7 +53,8 @@ fn main() {
         thread.join().unwrap()
     }
 }
-  
+
+// a crawler thread handles one domain at a time. once done, it grabs a new domain unassigned to a crawler from the queue
 fn crawler_thread(arc_mutex_db: Arc<Mutex<Box<dyn database::Database + Send>>>, httprequest: http_request::HTTPRequest, crawler_id: i32, max_crawl_depth: i32) {
     
     let robotstxt: &mut dyn robots_txt::RobotsTXT = &mut robots_txt::RobotsTXTCrate::new(httprequest.clone());
