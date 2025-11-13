@@ -17,7 +17,7 @@ pub struct PostgresDBInfo {
 
 #[derive(Serialize, Deserialize)]
 pub struct IndexerConfig {
-    pub time_between_indexes: i32,
+    pub time_between_indexes: u64,
     pub log: String
 }
 

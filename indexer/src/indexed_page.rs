@@ -1,11 +1,13 @@
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::ops::Add;
+
 use crate::crawled_page;
 use crate::database;
+use crate::dictionary;
 
 pub trait IndexedPage {
-    fn from_crawled_page(self: &mut Self, page: crawled_page::CrawledPage);
+    fn from_crawled_page(self: &mut Self, page: crawled_page::CrawledPage, dict: &dyn dictionary::Dictionary);
     fn consume_into_db(self: &mut Self, db: &mut dyn database::Database) -> Result<(), database::Error>;
 }
 
@@ -17,13 +19,29 @@ pub struct BasicIndexedPage {
 }
 
 impl IndexedPage for BasicIndexedPage {
-    fn from_crawled_page(self: &mut Self, page: crawled_page::CrawledPage) {
+    fn from_crawled_page(self: &mut Self, page: crawled_page::CrawledPage, dict: &dyn dictionary::Dictionary) {
         self.url = page.url;
         self.title = page.title;
         self.description = page.description;
 
         for word in page.words {
-            self.words.insert_or_sum(word.word, word.count as u64);
+            if dict.get_word_status(&word.word) == dictionary::WordStatus::Filler {
+                continue
+            }
+
+            let multiplier = match word.parent.as_str() {
+                "title" => 30,
+                "h1" => 20,
+                "h2" => 18,
+                "h3" => 16,
+                "h4" => 14,
+                "h5" => 12,
+                "h6" => 10,
+                "a" => 5,
+                _ => 1
+            };
+
+            self.words.insert_or_sum(word.word, (word.count * multiplier) as u64);
         }
     }
 

@@ -5,6 +5,7 @@ pub trait Dictionary {
 }
 
 #[derive(Clone)]
+#[derive(PartialEq)]
 pub enum WordStatus {
     Valid,
     Filler
@@ -24,7 +25,7 @@ impl Dictionary for BasicDictionary {
 }
 
 impl BasicDictionary {
-    fn new() -> Self {
+    pub fn new() -> Self {
         return BasicDictionary {
             map: [
                 ("a",WordStatus::Filler),

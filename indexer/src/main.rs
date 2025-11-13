@@ -1,4 +1,4 @@
-use log::{LevelFilter};
+use log::{error, info, debug, LevelFilter};
 use env_logger::Builder;
 
 mod dictionary;
@@ -18,27 +18,27 @@ fn main() {
         .init();
 
     let db: &mut dyn database::Database = &mut database::PostgresDatabase::new(&conf.database);
-    // let dict: 
+    let dict: &dyn dictionary::Dictionary = &dictionary::BasicDictionary::new();
 
     loop {
-        index(db, &conf);
-        std::thread::sleep(std::time::Duration::from_secs(20));
+        index(db, dict);
+        std::thread::sleep(std::time::Duration::from_secs(conf.indexer.time_between_indexes));
     }
 }
 
-fn index(db: &mut dyn database::Database, _conf: &config::Config) {
-    
+fn index(db: &mut dyn database::Database, dict: &dyn dictionary::Dictionary) {
+    info!("Starting index");
     for _ in 0..db.crawled_page_len() {
+
         let crawled = db.get_crawled_page().unwrap();
-        // println!("crawled_page: {:?}\n", crawled_page.unwrap().url);
+        debug!("Indexing {}", crawled.url);
 
         let indexed: &mut dyn indexed_page::IndexedPage = &mut indexed_page::BasicIndexedPage::new();
-        indexed.from_crawled_page(crawled);
+        indexed.from_crawled_page(crawled, dict);
         match indexed.consume_into_db(db) {
             Ok(_) => {},
-            Err(t) => println!("{:?}", t),
+            Err(t) => error!("{:?}", t),
         };
-
-        return
     }
+    info!("Index Complete");
 }
