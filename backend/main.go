@@ -1,19 +1,17 @@
 package main
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
 	"math"
 	"net/http"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/joho/godotenv"
+	"prushton.com/search/config"
 	"prushton.com/search/database"
 )
 
@@ -22,6 +20,8 @@ type HTTPResponse struct {
 	Metadata     map[string]database.SiteMetadata `json:"metadata"`
 	ElapsedTime  int64                            `json:"elapsedtime"`
 	TotalResults int64                            `json:"totalResults"`
+	PageNo       int64                            `json:"pageno"`
+	PageSize     int64                            `json:"pagesize"`
 }
 
 type ScoredURL struct {
@@ -37,8 +37,8 @@ type SortableScoredURL struct {
 	OccurrencesInQuery int64  `json:"occurrencesInQuery"`
 }
 
-var dbinfo database.DBInfo = database.DBInfo{}
-var conn *sql.DB = nil
+var conf config.Config = config.Config{}
+var db database.Database = database.Database{Client: nil}
 
 func addScoredURLs(self map[string]ScoredURL, other map[string]int64) map[string]ScoredURL {
 	// iterate over the other one
@@ -85,12 +85,17 @@ func search(w http.ResponseWriter, r *http.Request) {
 	rawSearch = strings.ToLower(rawSearch)
 	search := strings.Split(rawSearch, " ")
 
+	// fmt.Printf("Raw search: %s\n", rawSearch)
+	// fmt.Printf("Search: %s\n", search)
+
 	pageNo, err := strconv.ParseInt(query.Get("p"), 10, 64)
 	if err != nil {
 		pageNo = 1
 	}
 
-	if conn == nil {
+	// fmt.Printf("Page %d\n", pageNo)
+
+	if db.Client == nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		io.WriteString(w, "No database connection found")
 		return
@@ -100,9 +105,10 @@ func search(w http.ResponseWriter, r *http.Request) {
 	var Scores map[string]ScoredURL = make(map[string]ScoredURL)
 
 	for _, word := range search {
-		newURLs, err := database.Get_words(conn, word)
+		newURLs, err := db.Get_words(word, int(pageNo))
 
 		if err != nil {
+			fmt.Printf("Error %s\n", err)
 			continue
 		}
 
@@ -113,12 +119,12 @@ func search(w http.ResponseWriter, r *http.Request) {
 	SortedURLs := SortURLs(Scores)
 
 	// 50 is the page size, we are clamping the upper cap inside the size of the array and making sure lowercap is 50 less than uppercap or 0
-	upperCap := int64(math.Min(float64(pageNo*50), float64(len(SortedURLs))))
-	lowerCap := int64(math.Max(float64((pageNo-1)*50), 0.0))
+	upperCap := int64(math.Min(float64(pageNo*int64(db.PageSize)), float64(len(SortedURLs))))
+	lowerCap := int64(math.Max(float64((pageNo-1)*int64(db.PageSize)), 0.0))
 
 	TrimmedURLs := SortedURLs[lowerCap:upperCap]
 
-	metadata, err := database.Get_site_metadata(conn, TrimmedURLs)
+	metadata, err := db.Get_site_metadata(TrimmedURLs)
 
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -133,6 +139,8 @@ func search(w http.ResponseWriter, r *http.Request) {
 		Metadata:     metadata,
 		ElapsedTime:  end - start,
 		TotalResults: int64(len(SortedURLs)),
+		PageNo:       pageNo,
+		PageSize:     int64(db.PageSize),
 	}
 
 	v, err := json.Marshal(response)
@@ -148,23 +156,19 @@ func search(w http.ResponseWriter, r *http.Request) {
 func main() {
 	var err error
 
-	err = godotenv.Load()
+	conf, err = config.ReadFromFile("../config.yaml")
 	if err != nil {
-		fmt.Printf("Error running godotenv.Load() with error '%s'; Assuming env is provided via docker\n", err)
+		fmt.Printf("Error loading config with error '%s'", err)
+		return
 	}
 
-	dbinfo.User = os.Getenv("POSTGRES_DB_USER")
-	dbinfo.Host = os.Getenv("POSTGRES_DB_HOST")
-	dbinfo.Password = os.Getenv("POSTGRES_DB_PASSWORD")
-	dbinfo.Dbname = os.Getenv("POSTGRES_DB_DATABASE")
-
 	fmt.Printf(" ----- Database Authentication ----- \n")
-	fmt.Printf("username: %s\n", os.Getenv("POSTGRES_DB_USER"))
-	fmt.Printf("password: %s\n", os.Getenv("POSTGRES_DB_PASSWORD"))
-	fmt.Printf("host:     %s\n", os.Getenv("POSTGRES_DB_HOST"))
-	fmt.Printf("database: %s\n", os.Getenv("POSTGRES_DB_DATABASE"))
+	fmt.Printf("username: %s\n", conf.Database.Username)
+	fmt.Printf("password: %s\n", conf.Database.Password)
+	fmt.Printf("host:     %s\n", conf.Database.Host)
+	fmt.Printf("dbname:   %s\n", conf.Database.Dbname)
 
-	conn, err = database.Connect(dbinfo)
+	db, err = database.Connect(conf.Database, 50)
 
 	if err != nil {
 		fmt.Println("Error connecting to database, exiting")

@@ -43,6 +43,12 @@ impl IndexedPage for BasicIndexedPage {
 
             self.words.insert_or_sum(word.word, (word.count * multiplier) as u64);
         }
+
+        for (word, score) in self.words.clone().iter() {
+            if *score <= 2 {
+                self.words.remove(word);
+            }
+        }
     }
 
     fn consume_into_db(self: &mut Self, db: &mut dyn database::Database) -> Result<(), database::Error> {

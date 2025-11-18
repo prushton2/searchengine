@@ -1,3 +1,8 @@
+database:
+  host: "localhost"
+  username: "user"
+  password: "password"
+  dbname: "maindb"
 crawler:
   crawler_threads: 2
   max_crawl_depth: 3
@@ -7,8 +12,5 @@ crawler:
 indexer:
   time_between_indexes: 20
   log: "info"
-database:
-  host: "localhost"
-  username: "user"
-  password: "password"
-  dbname: "maindb"
+backend:
+  page_size: 50
