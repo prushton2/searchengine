@@ -1,51 +1,51 @@
 services:
-  # crawler:
-  #   build: crawler
-  #   container_name: crawler
-  #   restart: always
-  #   depends_on:
-  #     db:
-  #       condition: service_healthy
-  #   volumes:
-  #     - "./config:/config"
+  crawler:
+    build: crawler
+    container_name: searchengine-crawler
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - "./config-prod:/config"
 
-  # indexer:
-  #   build: indexer
-  #   container_name: indexer
-  #   restart: always
-  #   depends_on:
-  #     db:   
-  #       condition: service_healthy
-  #   volumes:
-  #     - "./config:/config"
+  indexer:
+    build: indexer
+    container_name: searchengine-indexer
+    restart: always
+    depends_on:
+      db:   
+        condition: service_healthy
+    volumes:
+      - "./config-prod:/config"
 
-  # backend:
-  #   build: backend
-  #   container_name: backend
-  #   restart: always
-  #   depends_on:
-  #     db:
-  #       condition: service_healthy
-  #   volumes:
-  #     - "./config:/config"
+  backend:
+    build: backend
+    container_name: searchengine-backend
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - "./config-prod:/config"
 
-  # frontend:
-  #   build: frontend
-  #   container_name: frontend
-  #   restart: always
-  #   depends_on:
-  #     db:
-  #       condition: service_healthy
+  frontend:
+    build: frontend
+    container_name: searchengine-frontend
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
 
   db:
     image: postgres:16
-    container_name: db
+    container_name: searchengine-db
     restart: always
     shm_size: 128mb
     volumes:
       - ./postgres-data/data:/var/lib/postgresql/data/
-    ports:
-      - 5432:5432
+    # ports:
+    #   - 5432:5432
     environment:
       POSTGRES_USER: ${POSTGRES_DB_USER}
       POSTGRES_PASSWORD: ${POSTGRES_DB_PASSWORD}
@@ -58,17 +58,11 @@ services:
       retries: 5
       start_period: 10s
   
-  # caddy:
-  #   image: caddy
-  #   container_name: caddy
-  #   restart: always
-  #   ports:
-  #     - "8080:80"
-
-  adminer:
-    image: adminer
+  caddy:
+    image: caddy
+    container_name: searchengine-caddy
     restart: always
     ports:
-      - 8081:8080
+      - "${PORT}:80"
     volumes:
-      - ./caddy-data/config:/config
+      - ./config-prod/Caddyfile:/etc/caddy/Caddyfile

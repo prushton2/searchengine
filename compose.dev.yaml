@@ -1,0 +1,36 @@
+services:
+  db:
+    image: postgres:16
+    container_name: searchengine-db
+    restart: always
+    shm_size: 128mb
+    volumes:
+      - ./postgres-data/data:/var/lib/postgresql/data/
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_USER: ${POSTGRES_DB_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_DB_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB_DATABASE}
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_DB_USER} -d ${POSTGRES_DB_DATABASE}"]
+      interval: 30s
+      timeout: 60s
+      retries: 5
+      start_period: 10s
+  
+  caddy:
+    image: searchengine-caddy
+    container_name: caddy
+    restart: always
+    volumes:
+      - ./config/Caddyfile:/etc/caddy/Caddyfile
+    network_mode: host
+    
+  adminer:
+    image: adminer
+    restart: always
+    container_name: searchengine-adminer
+    ports:
+      - 8081:8080

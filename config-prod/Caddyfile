@@ -1,0 +1,4 @@
+localhost:80 {
+	reverse_proxy /search searchengine-backend:3333
+	reverse_proxy /* searchengine-frontend:80
+}
