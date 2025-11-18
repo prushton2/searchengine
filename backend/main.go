@@ -156,7 +156,7 @@ func search(w http.ResponseWriter, r *http.Request) {
 func main() {
 	var err error
 
-	conf, err = config.ReadFromFile("../config.yaml")
+	conf, err = config.ReadFromFile("../config/config.yaml")
 	if err != nil {
 		fmt.Printf("Error loading config with error '%s'", err)
 		return

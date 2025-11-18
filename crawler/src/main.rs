@@ -12,7 +12,7 @@ mod database;
 mod config;
 
 fn main() {
-    let config = config::Config::read_from_file("../config.yaml");
+    let config = config::Config::read_from_file("../config/config.yaml");
 
     Builder::new()
         // Set project's max level

@@ -1,55 +1,45 @@
 services:
   # crawler:
   #   build: crawler
+  #   container_name: crawler
   #   restart: always
-  
   #   depends_on:
   #     db:
   #       condition: service_healthy
-
-  #   env_file:
-  #     - .env
+  #   volumes:
+  #     - "./config:/config"
 
   # indexer:
   #   build: indexer
+  #   container_name: indexer
   #   restart: always
-
   #   depends_on:
   #     db:   
   #       condition: service_healthy
-
-  #   env_file:
-  #     - .env
+  #   volumes:
+  #     - "./config:/config"
 
   # backend:
   #   build: backend
+  #   container_name: backend
   #   restart: always
-
-  #   env_file:
-  #     - .env
-
-  #   ports:
-  #     - ${BACKEND_PORT}:3333
   #   depends_on:
   #     db:
   #       condition: service_healthy
+  #   volumes:
+  #     - "./config:/config"
 
   # frontend:
-  #   build: 
-  #     context: frontend
-  #     args:
-  #       - VITE_BACKEND_URL=${VITE_BACKEND_URL}
-
+  #   build: frontend
+  #   container_name: frontend
   #   restart: always
-
-  #   ports:
-  #     - ${FRONTEND_PORT}:80
   #   depends_on:
   #     db:
   #       condition: service_healthy
 
   db:
     image: postgres:16
+    container_name: db
     restart: always
     shm_size: 128mb
     volumes:
@@ -67,9 +57,18 @@ services:
       timeout: 60s
       retries: 5
       start_period: 10s
+  
+  # caddy:
+  #   image: caddy
+  #   container_name: caddy
+  #   restart: always
+  #   ports:
+  #     - "8080:80"
 
   adminer:
-   image: adminer
-   restart: always
-   ports:
-     - 8081:8080
+    image: adminer
+    restart: always
+    ports:
+      - 8081:8080
+    volumes:
+      - ./caddy-data/config:/config

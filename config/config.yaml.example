@@ -1,5 +1,5 @@
 database:
-  host: "localhost"
+  host: "db"
   username: "user"
   password: "password"
   dbname: "maindb"
