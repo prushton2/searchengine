@@ -1,21 +1,26 @@
-use postgres::{Client, NoTls};
-
+use postgres::{Client, NoTls, error::SqlState};
+use crate::config::PostgresDBInfo;
 use crate::crawled_page;
-use crate::indexed_page;
 
-pub struct Database {
-    client: Client,
+pub trait Database {
+    fn get_crawled_page(self: &mut Self) -> Option<crawled_page::CrawledPage>;
+    fn crawled_page_len(self: &mut Self) -> u32;
+    fn write_indexed_page(self: &mut Self, url: &str, title: &str, desc: &str) -> Result<(), Error>;
+    fn write_indexed_words(self: &mut Self, url: &str, words: &mut dyn Iterator<Item = (String, u64)>) -> Result<(), Error>;
 }
 
-pub struct DBInfo {
-    pub host: String,
-    pub username: String,
-    pub password: String,
-    pub dbname: String
+#[allow(dead_code)]
+#[derive(Debug)]
+pub enum Error {
+    SQLError(Option<SqlState>)
 }
 
-impl Database {
-    pub fn new(dbinfo: &DBInfo) -> Self {
+pub struct PostgresDatabase {
+    client: Client
+}
+
+impl PostgresDatabase {
+    pub fn new(dbinfo: &PostgresDBInfo) -> Self {
         let string: String = format!("host={} user={} password={} dbname={}", dbinfo.host, dbinfo.username, dbinfo.password, dbinfo.dbname);
         let new_client = Client::connect(&string, NoTls).unwrap();
 
@@ -25,8 +30,10 @@ impl Database {
         
         return db;
     }
+}
 
-    pub fn crawled_page_len(self: &mut Self) -> u32 {
+impl Database for PostgresDatabase {
+    fn crawled_page_len(self: &mut Self) -> u32 {
         let response = match self.client.query_one(
             "SELECT count(*) FROM crawleddata",
             &[]
@@ -38,92 +45,83 @@ impl Database {
         return response.get::<&str, i64>("count") as u32;
     }
 
-    pub fn get_crawled_page(self: &mut Self) -> Option<crawled_page::CrawledPage> {
-        let crawled_data_response = match self.client.query_one(
-            "SELECT * FROM crawleddata LIMIT 1;",
+    fn get_crawled_page(self: &mut Self) -> Option<crawled_page::CrawledPage> {
+        let response = match self.client.query(
+            "SELECT * FROM (SELECT * FROM crawleddata LIMIT 1) AS sq LEFT JOIN crawledwords ON sq.url=crawledwords.url",
             &[]
         ) {
             Ok(t) => t,
             Err(_) => return None
         };
 
-        let mut crawled_data: crawled_page::CrawledPage = crawled_page::CrawledPage{
-            url: crawled_data_response.get::<&str, String>("url"),
-            title: crawled_data_response.get::<&str, String>("title"),
-            description: crawled_data_response.get::<&str, String>("description"),
+        let mut crawled_data = crawled_page::CrawledPage {
+            url: response[0].get::<&str, String>("url"),
+            title: response[0].get::<&str, String>("title"),
+            description: response[0].get::<&str, String>("description"),
             words: [].into()
         };
 
-        let words = match self.client.query(
-            "SELECT * FROM crawledwords WHERE url = $1",
-            &[&crawled_data.url]
-        ) {
-            Ok(t) => t,
-            Err(_) => {vec![]}
-        };
-
-        for row in words {
-            crawled_data.words.insert(
-                row.get::<&str, String>("word"),
-                row.get::<&str, i32>("count") as u64
+        for row in response {
+            crawled_data.words.push(
+                crawled_page::Word{
+                    word:   row.get::<&str, String>("word"),
+                    parent: row.get::<&str, String>("parent"),
+                    count:  row.get::<&str, i32>("count")
+                }
             );
         }
 
-        let delete1 = self.client.execute(
-            "DELETE FROM crawleddata WHERE url = $1",
+        match self.client.execute(
+            "DELETE FROM crawledurls WHERE url=$1;",
             &[&crawled_data.url]
-        );
-
-        let delete2 = self.client.execute(
-            "DELETE FROM crawledwords WHERE url = $1",
-            &[&crawled_data.url]
-        );
-
-        if delete1.is_err() {
-            println!("Failed to delete {} from crawleddata\n   err: {:?}\n", crawled_data.url, delete1.err())
+        ) {
+            Ok(_) => {}
+            Err(t) => println!("error: {:?}", t)
         }
 
-        if delete2.is_err() {
-            println!("Failed to delete {} from crawledwords\n   err: {:?}\n", crawled_data.url, delete2.err())
+        match self.client.execute(
+            "DELETE FROM crawleddata WHERE url=$1;",
+            &[&crawled_data.url]
+        ) {
+            Ok(_) => {}
+            Err(t) => println!("error: {:?}", t)
         }
 
-        return Some(crawled_data)
+        return Some(crawled_data);
     }
 
-    pub fn write_indexed_page(self: &mut Self, indexedpage: &indexed_page::IndexedPage) -> Result<String, String> {
-        // write metadata
-        match self.client.execute(
-            "INSERT INTO sitemetadata VALUES ($1, $2, $3)
-            ON CONFLICT (url)
-            DO UPDATE SET
-                title = $2,
-                description = $3",
-            &[&indexedpage.url, &indexedpage.title, &indexedpage.description]
+    fn write_indexed_page(self: &mut Self, url: &str, title: &str, desc: &str) -> Result<(), Error> {
+        match self.client.query(
+            "INSERT INTO sitemetadata VALUES ($1, $2, $3) 
+                ON CONFLICT (url)
+                DO UPDATE SET
+                    title = $2,
+                    description = $3",
+            &[&url, &title, &desc]
         ) {
-            Ok(_) => {},
-            Err(t) => return Err(format!("{:?}", t))
+            Ok(_) => return Ok(()),
+            Err(t) => return Err(Error::SQLError(t.code().cloned()))
         };
+    }
 
-        // remove existing indexed data about site
+    fn write_indexed_words(self: &mut Self, url: &str, word_iterator: &mut dyn Iterator<Item = (String, u64)>) -> Result<(), Error> {
+        let mut words: Vec<String> = vec![];
+        let mut weights: Vec<i32> = vec![];
+        let mut urls: Vec<&str> = vec![];
+        
+        for (word, value) in word_iterator {
+            words.push(word);
+            weights.push(value as i32);
+            urls.push(url);
+        }
+
         match self.client.execute(
-            "DELETE FROM indexedwords WHERE url = $1",
-            &[&indexedpage.url]
-        ) {
-            Ok(_) => {},
-            Err(t) => {panic!("{:?}", t);},
-        };
-
-        // add words
-        let words: Vec<&String> = indexedpage.words.keys().collect();
-        let weights: Vec<i32> = indexedpage.words.values().map(|&x| x as i32).collect();
-        let urls: Vec<String> = vec![indexedpage.url.clone(); words.len()];
-
-        self.client.execute(
             "INSERT INTO indexedwords (url, word, weight)
             SELECT * FROM UNNEST($1::text[], $2::text[], $3::int[]);",
             &[&urls, &words, &weights]
-        ).unwrap();
-
-        return Ok("".to_string())
+        ) {
+            Ok(_) => return Ok(()),
+            Err(t) => return Err(Error::SQLError(t.code().cloned()))
+        }
     }
 }

@@ -1,0 +1,16 @@
+database:
+  host: "searchengine-db"
+  username: "user"
+  password: "password"
+  dbname: "maindb"
+crawler:
+  crawler_threads: 2
+  max_crawl_depth: 3
+  user_agent: "search.prushton.com/1.0 (https://github.com/prushton2/searchengine)"
+  seed_url: "https://wikipedia.org"
+  log: "info"
+indexer:
+  time_between_indexes: 20
+  log: "info"
+backend:
+  page_size: 50

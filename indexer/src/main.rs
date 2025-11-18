@@ -1,55 +1,44 @@
-use std::time::{Duration, SystemTime};
-use std::thread::sleep;
+use log::{error, info, debug, LevelFilter};
+use env_logger::Builder;
 
+mod dictionary;
 mod crawled_page;
 mod indexed_page;
-mod dictionary;
 mod database;
+mod config;
 
 fn main() {
-    let dbinfo = database::DBInfo{
-        host: dotenv::var("POSTGRES_DB_HOST").unwrap(),
-        username: dotenv::var("POSTGRES_DB_USER").unwrap(),
-        password: dotenv::var("POSTGRES_DB_PASSWORD").unwrap(),
-        dbname: dotenv::var("POSTGRES_DB_DATABASE").unwrap(),
-    };
+    let conf = config::Config::read_from_file("../config/config.yaml");
 
-    let environment: String = dotenv::var("ENVIRONMENT").unwrap();
+    Builder::new()
+        // Set project's max level
+        .filter(Some("indexer"), config::parse_log_level(&conf.indexer.log))
+        // turn off everything else
+        .filter(None, LevelFilter::Off)
+        .init();
 
-    let mut db = database::Database::new(&dbinfo);
+    let db: &mut dyn database::Database = &mut database::PostgresDatabase::new(&conf.database);
+    let dict: &dyn dictionary::Dictionary = &dictionary::BasicDictionary::new();
 
     loop {
-        let start = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).expect("").as_millis();
-        if environment == "dev" { println!("Starting index..."); }
-
-        match indexer_thread(&mut db) {
-            Ok(_) =>  if environment == "dev" { println!("Index successful"); },
-            Err(t) => println!("Index failed: {}", t),
-        };
-
-        let end = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).expect("").as_millis();
-        let dt: f64 = ((end - start) as f64) /1000.0;
-        if environment == "dev" { println!("Index took {} seconds", dt); }
-        sleep(Duration::new(20, 0));
+        index(db, dict);
+        std::thread::sleep(std::time::Duration::from_secs(conf.indexer.time_between_indexes));
     }
 }
 
-fn indexer_thread(db: &mut database::Database) -> Result<&'static str, &'static str>{
-    for _i in 0..db.crawled_page_len() {
-        let mut crawledpage: crawled_page::CrawledPage = match db.get_crawled_page() {
-            Some(t) => t,
-            None => {continue;}
-        };
+fn index(db: &mut dyn database::Database, dict: &dyn dictionary::Dictionary) {
+    info!("Starting index");
+    for _ in 0..db.crawled_page_len() {
 
-        let _ = crawledpage.filter_stop_words();
-        
-        let indexedpage = match crawledpage.index() {
-            Ok(t) => t,
-            Err(_) => {continue;}
-        };
+        let crawled = db.get_crawled_page().unwrap();
+        debug!("Indexing {}", crawled.url);
 
-        let _ = db.write_indexed_page(&indexedpage);
+        let indexed: &mut dyn indexed_page::IndexedPage = &mut indexed_page::BasicIndexedPage::new();
+        indexed.from_crawled_page(crawled, dict);
+        match indexed.consume_into_db(db) {
+            Ok(_) => {},
+            Err(t) => error!("{:?}", t),
+        };
     }
-
-    return Ok("")
+    info!("Index Complete");
 }

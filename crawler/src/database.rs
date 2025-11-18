@@ -1,28 +1,43 @@
+// Database trait should implement the following features:
+// Queue for urls storing url, depth, and crawler id. 0 refers to no assigned crawler
+// crawled words, storing the word, its parent element, the count, and the url
+// crawled data, storing the url, title, and a 512 character description
+
 use std::time::SystemTime;
-use postgres::{Client, NoTls};
+use postgres::{Client, NoTls, error::SqlState};
+use crate::parser;
+use crate::config::PostgresDBInfo;
 
-use crate::crawled_page;
-
-pub struct Database {
-    client: Client,
+pub trait Database {
+    fn set_schema(self: &mut Self) -> Result<(), Error>;
+    fn write_crawled_page(self: &mut Self, page: &parser::ParsedData, url: &String) -> Result<(), Error>;
+    fn urlqueue_count(self: &mut Self) -> i64;
+    fn urlqueue_pop_front(self: &mut Self, crawler_id: i32) -> Option<(String, i32)>;
+    fn urlqueue_push(self: &mut Self, url: &str, depth: i32, crawler_id: i32) -> Result<String, Error>;
+    fn crawledurls_status(self: &mut Self, url: &str) -> UsedUrlStatus;
+    fn crawledurls_add(self: &mut Self, url: &str) -> UsedUrlStatus;
 }
 
-pub struct DBInfo {
-    pub host: String,
-    pub username: String,
-    pub password: String,
-    pub dbname: String
+#[allow(dead_code)]
+#[derive(Debug)]
+pub enum Error {
+    SQLError(Option<SqlState>)
 }
 
 pub enum UsedUrlStatus {
     NewUrl,
     UrlDoesntExist,
+    URLExists,
     CannotCrawlUrl,
     CanCrawlUrl
 }
 
-impl Database {
-    pub fn new(dbinfo: &DBInfo) -> Self {
+pub struct PostgresDatabase {
+    client: Client
+}
+
+impl PostgresDatabase {
+    pub fn new(dbinfo: &PostgresDBInfo) -> Self {
         let string: String = format!("host={} user={} password={} dbname={}", dbinfo.host, dbinfo.username, dbinfo.password, dbinfo.dbname);
         let new_client = Client::connect(&string, NoTls).unwrap();
 
@@ -32,8 +47,10 @@ impl Database {
         
         return db;
     }
+}
 
-    pub fn set_schema(self: &mut Self) -> Result<String, String> {
+impl Database for PostgresDatabase {
+    fn set_schema(self: &mut Self) -> Result<(), Error> {
         let result = self.client.batch_execute("
             CREATE TABLE IF NOT EXISTS CrawledData (
                 url varchar(512) PRIMARY KEY,
@@ -43,10 +60,11 @@ impl Database {
 
             CREATE TABLE IF NOT EXISTS CrawledWords (
                 url varchar(512),
+                parent varchar(512),
                 word varchar(64),
                 count integer,
 
-                PRIMARY KEY (url, word)
+                PRIMARY KEY (url, word, parent)
             );
 
             CREATE TABLE IF NOT EXISTS URLQueue (
@@ -76,38 +94,41 @@ impl Database {
         ");
 
         match result {
-            Ok(_) => {return Ok("Done".to_string())},
-            Err(t) => {return Err(format!("Error initializing db schema: {}", t))}
+            Ok(_) => {return Ok(())},
+            Err(t) => {return Err(Error::SQLError(t.code().cloned()))}
         };
     }
 
-    pub fn write_crawled_page(self: &mut Self, crawledpage: &crawled_page::CrawledPage) {
+
+    fn write_crawled_page(self: &mut Self, page: &parser::ParsedData, url: &String) -> Result<(), Error> {
         let mut urls: Vec<String> = vec![];
         let mut words: Vec<String> = vec![];
+        let mut parents: Vec<String> = vec![];
         let mut counts: Vec<i32> = vec![];
 
-        for (word, count) in crawledpage.words.iter() {
-            if word.len() > 64 {
+        for word in page.words.iter() {
+            if word.word.len() > 64 {
                 continue;
             }
 
-            urls.push(crawledpage.url.clone());
-            words.push(word.clone());
-            counts.push((*count) as i32);
+            urls.push(url.clone());
+            words.push(word.word.clone());
+            parents.push(word.parent.clone());
+            counts.push(word.count as i32);
             
         }
         
         match self.client.execute(
-            "INSERT INTO crawledwords (url, word, count)
-            SELECT * FROM UNNEST($1::text[], $2::text[], $3::int[])",
-            &[&urls, &words, &counts]
+            "INSERT INTO crawledwords (url, parent, word, count)
+            SELECT * FROM UNNEST($1::text[], $2::text[], $3::text[], $4::int[])",
+            &[&urls, &parents, &words, &counts]
         ) {
             Ok(_) => {},
-            Err(t) => panic!("Error writing to database: {}", t)
+            Err(t) => return Err(Error::SQLError(t.code().cloned()))
         };
         /*  
             This is at the end because i cant be bothered to lock the db
-            tldr: The crawleddata gets written -> indexer pops new crawleddata entry ->
+            tldr: An issue appears whe the crawleddata gets written -> indexer pops new crawleddata entry ->
             indexer only gets some words, the rest arent written yet -> 
             orphaned words build up over time
 
@@ -117,14 +138,15 @@ impl Database {
 
         match self.client.execute(
             "INSERT INTO crawleddata VALUES ($1, $2, $3);",
-            &[&crawledpage.url, &crawledpage.title, &crawledpage.description]
+            &[&url, &page.title, &page.description]
         ) {
             Ok(_) => {},
-            Err(t) => panic!("Error writing to database: {}", t)
+            Err(t) => return Err(Error::SQLError(t.code().cloned()))
         };
+        return Ok(())
     }
 
-    pub fn urlqueue_count(self: &mut Self) -> i64 {
+    fn urlqueue_count(self: &mut Self) -> i64 {
         let row = match self.client.query_one(
             "SELECT COUNT(*) FROM urlqueue",
             &[]
@@ -135,67 +157,58 @@ impl Database {
         return row.get::<&str, i64>("count")
     }
 
-    pub fn urlqueue_pop_front(self: &mut Self, crawler_id: i32) -> Option<(String, u8)> {
+    fn urlqueue_pop_front(self: &mut Self, crawler_id: i32) -> Option<(String, i32)> {
         // get a url owned by the callee
-        let row = match self.client.query_one(
-            "SELECT * FROM urlqueue WHERE crawler_id=$1 LIMIT 1",
+        match self.client.query_one(
+            "DELETE FROM urlqueue WHERE url = (
+                SELECT url FROM urlqueue
+                WHERE crawler_id=$1 OR crawler_id=0
+                ORDER BY crawler_id DESC LIMIT 1
+            ) RETURNING url, depth",
             &[&crawler_id]
         ) {
-            Ok(t) => t,
+            Ok(t) => {
+                let data: (String, i32) = (
+                    t.get::<&str, String>("url"), 
+                    t.get::<&str, i32>("depth")
+                );
+                return Some(data)
+            },
+
             // if fails, get an unowned url
-            Err(_) => match self.client.query_one(
-                "SELECT * FROM urlqueue WHERE crawler_id=0 LIMIT 1",
-                &[]
-            ) {
-                Ok(t) => t,
-                Err(_) => return None
-            }
-        };
-
-        let data: (String, u8) = (
-            row.get::<&str, String>("url"), 
-            row.get::<&str, i32>("depth") as u8
-        );
-
-        let _ = self.client.execute(
-            "DELETE FROM urlqueue WHERE url = $1",
-            &[&data.0]
-        );
-
-        return Some(data)
+            Err(_) => return None
+        }
     }
 
-    pub fn urlqueue_push(self: &mut Self, url: &str, depth: u8, crawler_id: i32) -> Result<String, String> {
+    fn urlqueue_push(self: &mut Self, url: &str, depth: i32, crawler_id: i32) -> Result<String, Error> {
         match self.client.execute(
             "INSERT INTO urlqueue VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
-            &[&url, &(depth as i32), &crawler_id]
+            &[&url, &depth, &crawler_id]
         ) {
             Ok(_) => return Ok("Success".to_string()),
-            Err(t) => return Err(format!("Error running urlqueue_push: {}", t))
+            Err(t) => return Err(Error::SQLError(t.code().cloned()))
         };
     }
 
-    // enter a url and get the status of if its used or not
-    pub fn crawledurls_status(self: &mut Self, url: &str) -> Result<UsedUrlStatus, String> {
+    fn crawledurls_status(self: &mut Self, url: &str) -> UsedUrlStatus {
         let used_url = match self.client.query_one(
             "SELECT * FROM crawledurls WHERE url = $1",
             &[&url]
         ) {
             Ok(t) => t,
-            // bad i know
-            Err(_t) => return Ok(UsedUrlStatus::UrlDoesntExist)
+            Err(_t) => return UsedUrlStatus::UrlDoesntExist
         };
 
         let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).expect("").as_secs();
         let expiry_time = used_url.get::<&str, i64>("crawl_again_at");
 
         if (expiry_time as u64) < now {
-            return Ok(UsedUrlStatus::CanCrawlUrl);
+            return UsedUrlStatus::CanCrawlUrl;
         }
-        return Ok(UsedUrlStatus::CannotCrawlUrl);
+        return UsedUrlStatus::CannotCrawlUrl;
     }
 
-    pub fn crawledurls_add(self: &mut Self, url: &str) -> Result<UsedUrlStatus, String> {
+    fn crawledurls_add(self: &mut Self, url: &str) -> UsedUrlStatus {
         let oneweek = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).expect("").as_secs() + 7*86400;
 
         let _used_url = match self.client.execute(
@@ -203,14 +216,9 @@ impl Database {
             &[&url, &(oneweek as i64)]
         ) {
             Ok(t) => t,
-            // also bad yes i am aware
-            Err(t) => {println!("crawledurls_status: {:?}", t); return Ok(UsedUrlStatus::NewUrl)}
+            Err(_) => {return UsedUrlStatus::URLExists}
         };
 
-        return Ok(UsedUrlStatus::NewUrl)
+        return UsedUrlStatus::NewUrl
     }
-}
-
-pub fn safe_truncate(string: &String, count: usize) -> String {
-    return string.chars().take(count).collect();
 }

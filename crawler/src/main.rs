@@ -1,141 +1,139 @@
-use std::time::{Duration};
-use std::thread;
 use std::sync::{Mutex, Arc};
-use std::str;
-use dotenv;
-
+use std::thread;
 use url::Url;
-use robotstxt::DefaultMatcher;
+use log::{warn, trace, debug, info, error, LevelFilter};
+use env_logger::Builder;
 
-mod crawled_page;
-mod page_content;
+mod robots_txt;
+mod http_request;
+mod request_handler;
+mod parser;
 mod database;
-
-static USER_AGENT: &str = "search.prushton.com/1.0 (https://github.com/prushton2/searchengine)";
+mod config;
 
 fn main() {
-    let max_crawl_depth: u8 = dotenv::var("MAX_CRAWL_DEPTH").unwrap().parse().expect("Invalid crawl depth, must be an unsigned 8 bit integer");
-    let crawler_threads: u8 = dotenv::var("CRAWLER_THREADS").unwrap().parse().expect("Invalid crawler threads count, must be an unsigned 8 bit integer");
+    let config = config::Config::read_from_file("../config/config.yaml");
 
-    let dbinfo = database::DBInfo{
-        host: dotenv::var("POSTGRES_DB_HOST").unwrap(),
-        username: dotenv::var("POSTGRES_DB_USER").unwrap(),
-        password: dotenv::var("POSTGRES_DB_PASSWORD").unwrap(),
-        dbname: dotenv::var("POSTGRES_DB_DATABASE").unwrap(),
+    Builder::new()
+        // Set project's max level
+        .filter(Some("crawler"), config::parse_log_level(&config.crawler.log))
+        // turn off everything else
+        .filter(None, LevelFilter::Off)
+        .init();
+
+    info!("Initializing {} crawler threads with a max depth of {}, and a seed url of {}", config.crawler.crawler_threads, config.crawler.max_crawl_depth, config.crawler.seed_url);
+    
+    let httprequest: http_request::HTTPRequest = http_request::HTTPRequest::new(&config.crawler.user_agent);
+    let mut database: Box<dyn database::Database + Send> = Box::new(database::PostgresDatabase::new(&config.database));
+    
+    match database.set_schema() {
+        Ok(()) => {info!("Initialized DB Schema");}
+        Err(_) => {}
     };
 
-    let mut db = database::Database::new(&dbinfo);
-    // set db schema
-    match db.set_schema() {
-        Ok(_) => {}
-        Err(t) => panic!("{}", t)
-    };
-
-    // ensure there is a starter url
-    if db.urlqueue_count() == 0 {
-        // empty, add starting url
-        let _ = db.urlqueue_push("http://en.wikipedia.org/wiki/Banana_republic", 0, 0);
+    if database.urlqueue_count() == 0 {
+        let _ = database.urlqueue_push(&config.crawler.seed_url, 0, 0);
+        info!("pushed seed url to queue");
     }
 
-    let safe_db = Arc::new(Mutex::new(db));
-    
-    println!("Crawler running");
+    let arc_mutex_db = Arc::new(Mutex::new(database));
 
     let mut threads = vec![];
 
-    for i in 1..crawler_threads+1 {
-        let safe = Arc::clone(&safe_db);
+    // I start at 1 because a url with a crawler id 0 in the database means it unassigned to a crawler
+    for i in 1..config.crawler.crawler_threads+1 {
+        let arc_db = Arc::clone(&arc_mutex_db);
+        let http_clone = httprequest.clone();
         threads.push(thread::spawn(move || {
-            crawler_thread(safe, max_crawl_depth, i.into());
-        }));
+            crawler_thread(arc_db, http_clone, i, config.crawler.max_crawl_depth);
+        }))
     }
 
     for thread in threads {
         thread.join().unwrap()
     }
-
 }
 
-fn crawler_thread(db_arc_mutex: Arc<Mutex<database::Database>>, max_crawl_depth: u8, crawler_id: i32) {
-    let mut previous_domain: String = String::from("");
-    let mut robotstxt: String = String::from("");
-    let environment = dotenv::var("ENVIRONMENT").unwrap();
-    // let mut i = 0;
+// a crawler thread handles one domain at a time. once done, it grabs a new domain unassigned to a crawler from the queue
+fn crawler_thread(arc_mutex_db: Arc<Mutex<Box<dyn database::Database + Send>>>, httprequest: http_request::HTTPRequest, crawler_id: i32, max_crawl_depth: i32) {
+    
+    let robotstxt: &mut dyn robots_txt::RobotsTXT = &mut robots_txt::RobotsTXTCrate::new(httprequest.clone());
+    let requesthandler: &mut dyn request_handler::RequestHandler = &mut request_handler::SimpleRequestHandler::new(robotstxt, &httprequest);
 
-    loop {
-        let mut matcher = DefaultMatcher::default();
-        let mut db = db_arc_mutex.lock().unwrap();
-        // println!("crawler-{}  | Acquired DB Lock", crawler_id);
+    // if we get 5 loops with no urls, exit
+    let mut no_urls_count = 0;
+    
+    while no_urls_count < 5 {
 
-        // -- get the url of the site to crawl --
-        let raw_url_object: (String, u8) = match db.urlqueue_pop_front(crawler_id) {
-            Some(t) => t,
-            None => {
-                println!("crawler-{}  | Crawler ran out of urls", crawler_id);
-                // println!("crawler-{}  | Relinquishing DB Lock", crawler_id);
-                drop(db);
-                thread::sleep(Duration::from_millis(5000));
+        let (url, depth) = {
+            let mut database = arc_mutex_db.lock().unwrap();
+
+            match database.urlqueue_pop_front(crawler_id) {
+                Some(t) => {
+                    no_urls_count = 0;
+                    t
+                },
+                None => {
+                    if database.urlqueue_count() == 0 {
+                        no_urls_count += 1;
+                        warn!("{}  | No URLs in queue ({}/5)", crawler_id, no_urls_count);
+                    }
+                    drop(database);
+                    std::thread::sleep(std::time::Duration::from_secs(5));
+                    continue;
+                }
+            }
+        };
+
+        if depth > max_crawl_depth {
+            trace!("Too Deep");
+            continue;
+        }
+
+        let page_content: Vec<u8>;
+        let dereferenced_url: String;
+        
+        match requesthandler.fetch(&url) {
+            Ok(t) => {
+                page_content = t.0;
+                dereferenced_url = t.1;
+                debug!("{}  | Fetched {}", crawler_id, dereferenced_url);
+            }
+            Err(t) => {
+                debug!("{}  | Error fetching URL {}: {:?}", crawler_id, url, t);
+                continue;
+            },
+        }
+
+        // in normal circumstances this wouldnt run, but just incase
+        // there is an edge case where a url may not lose its qstring and fragment, causing it to be re queried
+        let mut database = arc_mutex_db.lock().unwrap();
+        match database.crawledurls_add(&dereferenced_url) {
+            database::UsedUrlStatus::NewUrl => {},
+            database::UsedUrlStatus::URLExists => {
+                debug!("URL Already crawled: {}", dereferenced_url);
+                continue;
+            },
+            _ => {}
+        }
+        
+        let parsed_content: parser::ParsedData = match parser::parse_html(page_content, &dereferenced_url) {
+            Ok(t) => t,
+            Err(t) => { 
+                trace!("Bad parse: {:?}", t);
                 continue
             }
         };
 
-        let url_object = match Url::parse(&raw_url_object.0) {
-            Ok(mut t) => {filter_url(&mut t); t},
-            Err(_t) => continue
-        };
-
-        let url_string: &str = url_object.as_str();
-        let depth = raw_url_object.1;
-        drop(raw_url_object);
-        
-        // check if its in depth
-        if depth > max_crawl_depth {
-            continue;
-        }
-
-        // if the domain name changed, we need to refetch robots.txt
-        if url_object.domain() != Some(previous_domain.as_str()) {
-            robotstxt = fetch_robots_txt(&url_object);
-            previous_domain = url_object.domain().unwrap().to_string();
-            if environment == "dev" {
-                println!("crawler-{}  | New robots.txt file fetched from {}", crawler_id, url_object.domain().unwrap());
+        let dereferenced_url_object = match Url::parse(&dereferenced_url) {
+            Ok(t) => t,
+            Err(_) => { 
+                trace!("Failed to convert dereferenced url to url object");
+                continue;
             }
-        }
-
-        // check if we are allowed to crawl here
-        if !matcher.one_agent_allowed_by_robots(&robotstxt, USER_AGENT, &url_string) {
-            continue;
-        }
-
-        match db.crawledurls_status(url_string).unwrap() {
-            database::UsedUrlStatus::CannotCrawlUrl => {continue;}
-            _ => {}
         };
 
-        if environment == "dev" {
-            println!("crawler-{}  | {}: {}", crawler_id, depth, url_string);
-        }
-
-        // do the actual fetching
-        let response: (Vec<u8>, String) = match reqwest_url(&url_string) {
-            Ok(t) => t,
-            Err(t) => { if environment == "dev" { println!("crawler-{}  | Failed to get: {}, skipping", crawler_id, t); } continue; }
-        };
-        let bytes_slice = response.0.as_slice();
-        // deal with the url changing on 3XX codes
-        let dereferenced_url_object = match Url::parse(&response.1) {
-            Ok(t) => t,
-            Err(_) => { println!("crawler-{}  | Somehow the redirect url {} was valid enough to fetch, but isnt valid enough for the Url crate", crawler_id, response.1); continue; }
-        };
-
-        // convert to page content
-        let pagecontent = match page_content::PageContent::from_html(&bytes_slice) {
-            Ok(t) => t,
-            Err(_t) => { if environment == "dev" { println!("crawler-{}  | Failed to strip html from {}, skipping", crawler_id, &url_string); } continue; }
-        };
-
-
-        for raw_crawled_url in &pagecontent.links {
+        for raw_crawled_url in &parsed_content.urls {
             // Tries to parse a url. if it gets something like "/domains", it fails and then tries to join the path to the parent url,
             // so it would spit out "iana.org/domains". It double fails on fragments (good thing, they are stupid anyways). Part of me 
             // wants to make this an if statement but idiomatic code has corrupted me.
@@ -155,12 +153,13 @@ fn crawler_thread(db_arc_mutex: Arc<Mutex<database::Database>>, max_crawl_depth:
                 }
             };
 
-            match db.crawledurls_status(raw_crawled_url).unwrap() {
+            match database.crawledurls_status(crawled_url.as_str()) {
                 database::UsedUrlStatus::CannotCrawlUrl => {continue;}
                 _ => {}
             };
 
             if crawled_url.scheme() != "https" && crawled_url.scheme() != "http" {
+                debug!("Invalid schema on {}", crawled_url.as_str());
                 continue;
             }
 
@@ -174,28 +173,28 @@ fn crawler_thread(db_arc_mutex: Arc<Mutex<database::Database>>, max_crawl_depth:
                 // has to be nested since we dont want depth above max being put on the queue
                 if depth + 1 <= max_crawl_depth {
                     // add the url to the queue, and set the id of the crawler responsible for it. One crawler for one domain at a time, this makes it easier to respect the crawl_delay (still need to do)
-                    let _ = db.urlqueue_push(crawled_url.as_str(), depth+1, crawler_id);
+                    let _ = database.urlqueue_push(crawled_url.as_str(), depth+1, crawler_id);
                 }
             } else {
                 // if the domain is different, just add the domain unowned by any crawler
-                let _ = db.urlqueue_push(convert_url_to_domain(&crawled_url).as_str(), 0, 0);
+                let _ = database.urlqueue_push(convert_url_to_domain(&crawled_url).as_str(), 0, 0);
             }
         }
-        let _ = db.crawledurls_add(dereferenced_url_object.as_str());
-        
-        // convert pagecontent to crawled url
-        let crawledpage = crawled_page::CrawledPage::from_page_content(&pagecontent, url_string).unwrap();
-        
-        // write crawledurl to disk
-        db.write_crawled_page(&crawledpage);
-        
-        // println!("crawler-{}  | Relinquishing DB Lock", crawler_id);
-        drop(db);
 
-        // return;
-        thread::sleep(Duration::from_millis(5000));
+        match database.write_crawled_page(&parsed_content, &dereferenced_url) {
+            Ok(_) => {},
+            Err(t) => { 
+                warn!("Couldnt write page to db {:?}", t);
+                continue; 
+            }
+        }
+
+        drop(database);
+
+        std::thread::sleep(std::time::Duration::from_secs(5));
     }
 
+    error!("Crawler {} had no urls for 5 loops, exiting...", crawler_id);
 }
 
 fn filter_url(url: &mut url::Url) {
@@ -209,79 +208,4 @@ fn convert_url_to_domain(url: &url::Url) -> url::Url {
     filter_url(&mut converted_url);
     converted_url.set_path("");
     return converted_url;
-}
-
-fn reqwest_url(url: &str) -> Result<(Vec<u8>, String), String> {
-    let client = reqwest::blocking::Client::builder()
-        .user_agent(USER_AGENT)
-        .build()
-        .unwrap();
-    
-    let result = match client.get(url).send() {
-        Ok(t) => t,
-        Err(_) => return Err("Could not get URL".to_string())
-    };
-
-    if result.status().is_redirection() {
-        let redirect_to = match result.headers().get("location") {
-            Some(t) => match t.to_str() {
-                Ok(t) => t,
-                Err(t) => return Err(format!("Error getting redirect location: {}", t))
-            },
-            None => return Err("Couldnt find location header".to_string())
-        };
-
-        return reqwest_url(redirect_to);
-    }
-
-    if result.status().is_client_error() || result.status().is_server_error() {
-        return Err(format!("Status Code Invalid ({})", result.status().as_str()));
-    }
-
-    let content_type = match result.headers().get("content-type") {
-        Some(t) => t,
-        None => return Err("No content type header".to_string())
-    };
-
-    if content_type.to_str().is_err() {
-        return Err("Error verifying content type header".to_string())
-    }
-
-    if !content_type.to_str().unwrap().contains("text/html") {
-        return Err("Content type is not html".to_string())
-    }
-
-    let content_lang = match result.headers().get("content-language") {
-        Some(t) => t.to_str(),
-        None => Ok("en")
-    };
-
-    if content_lang.is_err() || content_lang.unwrap() != "en" {
-        return Err("Content language is not english".to_string())
-    }
-
-    let bytes = match result.bytes() {
-        Ok(t) => t,
-        Err(_) => return Err("Could not get bytes".to_string())
-    };
-
-    // returning the url lets us know what the actual url is when dereferencing 3XX Urls
-    return Ok((bytes.to_vec(), url.to_owned()))
-}
-
-fn fetch_robots_txt(url_object: &url::Url) -> String {
-    let mut robots_path = url_object.clone();
-    robots_path.set_path("/robots.txt");
-    robots_path.set_query(None);
-    robots_path.set_fragment(None);
-    
-    let robots_bytes: Vec<u8> = match reqwest_url(robots_path.as_str()) {
-        Ok(t) => t.0,
-        Err(_) => "user-agent: *\ndisallow:".as_bytes().to_owned()
-    };
-    
-    return match str::from_utf8(&robots_bytes) {
-        Ok(t) => t.to_string(),
-        Err(_) => "user-agent: *\ndisallow:".into(),
-    };
 }
