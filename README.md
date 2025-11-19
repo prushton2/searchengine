@@ -26,16 +26,15 @@ The responsibility of the crawler is to find text and urls in a page. I use a qu
 
 ## Issues
 ## Not started
-* The crawler is bad at filtering words. It will concatenate words in adjacent HTML elements, and cannot distinguish hex codes
-    * Ideally use a real tokenizer
-* Create multiple crawlers each with a thread
-    * count defined in .env
+* Use a real word tokenizer
 * Reqwest does not scrape pages with JS rendering
+* Connection Pooling
 ### In Progress
 * Needs to respect robots.txt
     * [ ] Read crawl delay for page
     * [X] Read allowed URLs
 ### Resolved
+* Create multiple crawlers each with a thread
 * Reqwest does not resolve 300 response codes, leading to pages that can only be searched with "Permanently Moved"
     * [X] Should return the dereferenced url and use that url for indexing
     * [X] Recursively dereferences 3XX codes
@@ -47,8 +46,9 @@ The indexer takes crawled data and sorts it by word.
 
 ## Issues
 ### In Progress
-* It is pretty slow. I suspect this to be the many non batched postgres queries, but i have yet to benchmark it
+* Half decent algorithm
 ### Resolved
+* Batching queries
 * This should use a real database
 * Strip non important words
 * The indexer is bad at character lengths, since characters arent well defined in unicode
@@ -58,57 +58,63 @@ The backend gets a search request and compiles the requested sites for the front
 
 ## Issues
 ### Not Started
-* Lowercase all letters in query
 ### In Progress
 ### Resolved
+* Lowercase all letters in query
 * It doesnt return sorted data
 * Ranking should look for word occurrences in webpage
-
-# Frontend
-The website to show the user their search query
-
-## Issues
-* NON ISSUE: It looks horrible
 
 
 # Database Schema
 
 ## CrawledData
-
-| primary_key url | title | description |
+Table of basic site data after a crawl
+| url | title | description |
 | :--- | :--- | :--- |
+| string | string | string |
+| primary_key | |
 
 ***
-
 ## CrawledWords
+Table of a word with its url and the parent element, with the amount of times it appears
 
-| primary_key url | primary_key word | count |
-| :--- | :--- | :--- |
+| url | word | parent | count |
+| :--- | :--- | :--- | :--- |
+| string | string | string | int |
+| primary_key | primary_key | primary_key | |
 
 ***
-
 ## URLQueue
+Queue of URLs. URLs with a crawler id of 0 are up for grabs by crawlers
 
-| primary_key url | depth | priority |
+| url | depth | crawler_id |
 | :--- | :--- | :--- |
+| string | int | int |
+| primary_key | | |
 
 ***
-
 ## CrawledURLs
+List of crawled urls and the time they can be crawled again at
 
-| primary_key url | crawled_again_at | |
+| url | crawled_again_at | |
 | :--- | :--- | :--- |
+| string | UNIX seconds |
+| primary_key | |
 
 ***
-
 ## IndexedWords
+Words with their site and the weight they have after being indexed
 
-| primary_key url | primary_key word | weight |
+| url | word | weight |
 | :--- | :--- | :--- |
+| string | string | int |
+| primary_key | primary_key | |
 
 ***
-
 ## SiteMetadata
+Basic info about the site to display on the frontend
 
-| primary_key url | title | description |
+| url | title | description |
 | :--- | :--- | :--- |
+| string | string | string |
+| primary_key | | |
