@@ -44,8 +44,6 @@ services:
     shm_size: 128mb
     volumes:
       - ./postgres-data/data:/var/lib/postgresql/data/
-    # ports:
-    #   - 5432:5432
     environment:
       POSTGRES_USER: ${POSTGRES_DB_USER}
       POSTGRES_PASSWORD: ${POSTGRES_DB_PASSWORD}
