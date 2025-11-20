@@ -21,8 +21,8 @@ services:
       start_period: 10s
   
   caddy:
-    image: searchengine-caddy
-    container_name: caddy
+    image: caddy
+    container_name: searchengine-caddy
     restart: always
     volumes:
       - ./config/Caddyfile:/etc/caddy/Caddyfile
