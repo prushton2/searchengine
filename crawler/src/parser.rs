@@ -58,8 +58,11 @@ pub fn parse_html(content: Vec<u8>, _url: &String) -> Result<ParsedData, ParseHT
             for word in parts {
                 if word.len() == 0 { continue; }
 
-                match wordmap.insert((parent_node.to_string(), word.to_string()), 1) {
-                    Some(n) => {wordmap.insert((parent_node.to_string(), word.to_string()), n+1);},
+                let alphanumeric_word = clean_alphanumeric(word);
+                let alphanumeric_parent = clean_alphanumeric(parent_node);
+
+                match wordmap.insert((alphanumeric_parent.clone(), alphanumeric_word.clone()), 1) {
+                    Some(n) => {wordmap.insert((alphanumeric_parent, alphanumeric_word), n+1);},
                     None => {}
                 }
             }
@@ -87,8 +90,10 @@ pub fn parse_html(content: Vec<u8>, _url: &String) -> Result<ParsedData, ParseHT
                     continue;
                 }
 
-                match wordmap.insert(("title".to_string(), word.to_string()), 1) {
-                    Some(n) => {wordmap.insert(("title".to_string(), word.to_string()), n+1);},
+                let alphanumeric = clean_alphanumeric(word);
+
+                match wordmap.insert(("title".to_string(), alphanumeric.clone()), 1) {
+                    Some(n) => {wordmap.insert(("title".to_string(), alphanumeric), n+1);},
                     None => {}
                 }
             }
@@ -138,6 +143,12 @@ fn remove_child_html(html: &String) -> String {
 
 fn clean_text(text: &str) -> String {
     let remove_non_alphanumeric = Regex::new(r"[^a-zA-Z\d\s:]|[\r\n]").unwrap();
+    let cleaned = remove_non_alphanumeric.replace_all(&text, " ").to_lowercase();
+    return cleaned;
+}
+
+fn clean_alphanumeric(text: &str) -> String {
+    let remove_non_alphanumeric = Regex::new(r"[^a-zA-Z\d]").unwrap();
     let cleaned = remove_non_alphanumeric.replace_all(&text, " ").to_lowercase();
     return cleaned;
 }
