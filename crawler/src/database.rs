@@ -120,7 +120,9 @@ impl Database for PostgresDatabase {
         
         match self.client.execute(
             "INSERT INTO crawledwords (url, parent, word, count)
-            SELECT * FROM UNNEST($1::text[], $2::text[], $3::text[], $4::int[])",
+            SELECT * FROM UNNEST($1::text[], $2::text[], $3::text[], $4::int[])
+            ON CONFLICT (url, parent, word)
+            DO UPDATE SET count = crawledwords.count + EXCLUDED.count",
             &[&urls, &parents, &words, &counts]
         ) {
             Ok(_) => {},

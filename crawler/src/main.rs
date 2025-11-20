@@ -35,8 +35,6 @@ fn main() {
         info!("pushed seed url to queue");
     }
 
-    // drop(database);
-    
     let mut threads = vec![];
 
     // I start at 1 because a url with a crawler id 0 in the database means it unassigned to a crawler
