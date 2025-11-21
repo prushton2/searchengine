@@ -28,8 +28,9 @@ The responsibility of the crawler is to find text and urls in a page. I use a qu
 ## Not started
 * Use a real word tokenizer
 * Reqwest does not scrape pages with JS rendering
-* Connection Pooling
+* Optimize scrapes, they take forever
 ### In Progress
+* [-]Connection Pooling // kinda done, should use an official crate i think
 * Needs to respect robots.txt
     * [ ] Read crawl delay for page
     * [X] Read allowed URLs
