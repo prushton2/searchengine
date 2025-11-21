@@ -6,7 +6,7 @@ database:
 crawler:
   crawler_threads: 2
   max_crawl_depth: 3
-  user_agent: "search.prushton.com/1.0 (https://github.com/prushton2/searchengine)"
+  user_agent: ""
   seed_url: "https://wikipedia.org"
   log: "info"
 indexer:

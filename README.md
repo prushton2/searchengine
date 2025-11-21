@@ -2,23 +2,16 @@
 A search engine built in Rust, Go, and React. This is purely a project for learning, I dont recommend actually using it.
 
 # Configuration
-Run `cp example.env .env` to create a template env file
-
-Options:
-
-| Option | Type | Description |
-| :--- | :--- | :--- |
-| **POSTGRES_DB_USER** | `string` | Username for the postgres db |
-| **POSTGRES_DB_PASSWORD** | `string` | Password for the postgres db |
-| **POSTGRES_DB_DATABASE** | `string` | db name for the postgres db |
-| **POSTGRES_DB_HOST** | `string` | hostname of the postgres db |
-| **MAX_CRAWL_DEPTH** | `uint8_t` | How many pages deep into a domain should the crawler go |
-| **CRAWLER_THREADS** | `u32` | How many crawlers should be running at once |
-| **VITE_BACKEND_URL** | `string` | URL of the backend |
-| **ENVIRONMENT**| `dev\|prod` | Environment the stack is running in |
-| **FRONTEND_PORT** | `port` | What port the docker compose should expose as the frontend port |
-| **BACKEND_PORT** | `port` | What port the docker compose should expose as the backend port |
-
+* Run `cp .env.example .env`
+* Edit `.env` to fit your preferences
+    * Define the postgres DB credentials
+    * Define the port that the web server will run on
+* Run `cp config-prod/config.yaml.example config-prod/config.yaml`
+* Edit `config-prod/config.yaml` 
+    * database to fit the settings defined in `.env`
+    * Set the user agent in the crawler
+    * `log` can be one of `error`, `warn`, `info`, `debug`, or `trace`
+    * Set a seed page
 
 
 # Crawler
