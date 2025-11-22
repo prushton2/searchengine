@@ -1,154 +1,183 @@
 // The parser doesnt implement an interface as it doesnt need state. Its job is to take raw bytes, and spit out some data regarding the content
-
-use scraper::{Html, Selector};
-use std::str;
-use regex::Regex;
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::default::Default;
+use std::ops::{Deref, DerefMut};
 
+use regex::Regex;
+
+use html5ever::interface::QualName;
+use html5ever::tendril::*;
+use html5ever::tokenizer::BufferQueue;
+use html5ever::tokenizer::Token::CharacterTokens;
+use html5ever::tokenizer::{EndTag, StartTag, TagToken};
+use html5ever::tokenizer::{Token, TokenSink, TokenSinkResult, Tokenizer, TokenizerOpts};
+use html5ever::{LocalName, ns};
+
+#[derive(Clone)]
 pub struct ParsedData {
     pub description: String,
     pub title: String,
     pub words: Vec<Word>,
-    pub urls: Vec<String>
+    pub urls: Vec<String>,
 }
 
+#[derive(Clone)]
 pub struct Word {
     pub word: String,
     pub parent: String,
-    pub count: i32
+    pub count: i32,
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub enum ParseHTMLError {
-    TextDecodeFailed
+    TextDecodeFailed,
+}
+
+struct TokenSinkState {
+    pub parent: Vec<String>,
+    pub parsed_data: ParsedData,
+    pub words: HashMap<(String, String), i32>,
+}
+
+struct TokenSinkWrapper {
+    pub rc: RefCell<TokenSinkState>,
+}
+
+impl TokenSink for TokenSinkWrapper {
+    type Handle = ();
+
+    fn process_token(&self, token: Token, _line_number: u64) -> TokenSinkResult<()> {
+        let link_name = QualName::new(None, ns!(), LocalName::from("href"));
+
+        let mut binding = self.rc.borrow_mut();
+        let state: &mut TokenSinkState = binding.deref_mut();
+
+        match token {
+            TagToken(tag) if tag.kind == StartTag => {
+                state.parent.push(tag.name.as_ref().to_string());
+                if tag.name.to_string() == "a" {
+                    let attrs = tag.attrs;
+                    for attr in attrs {
+                        if attr.name == link_name {
+                            state.parsed_data.urls.push(attr.value.to_string());
+                        }
+                    }
+                }
+            }
+            TagToken(tag) if tag.kind == EndTag => {
+                state.parent.pop();
+            }
+            CharacterTokens(tendril) if state.parent.contains(&String::from("body")) => {
+                // append to description
+                if state.parsed_data.description.chars().count() < 512 {
+                    state.parsed_data.description.push(' ');
+                    
+                    let new_desc =
+                        safe_truncate(&(*tendril).to_string(), 512 - state.parsed_data.description.chars().count());
+
+                    state.parsed_data.description.push_str(&new_desc);
+                }
+
+                // get parent
+                let parent = match state.parent.last() {
+                    Some(n) => n,
+                    None => &String::from(""),
+                };
+
+                let words = tendril.deref().split(" ");
+
+                for word in words {
+                    let clean_word = clean_alphanumeric(word);
+
+                    if clean_word.len() == 0 {
+                        continue
+                    }
+
+                    match state.words.insert((clean_word.clone(), parent.clone()), 1) {
+                        Some(n) => {
+                            state
+                                .words
+                                .insert((clean_word.clone(), parent.clone()), n + 1);
+                        }
+                        None => {}
+                    }
+                }
+            }
+
+            CharacterTokens(tendril) if state.parent.contains(&String::from("head")) => {
+                // get parent
+                let parent = match state.parent.last() {
+                    Some(n) => n,
+                    None => &String::from(""),
+                };
+
+                // set title
+                if parent == "title" {
+                    state.parsed_data.title = (*tendril).to_string();
+                }
+            }
+
+            _ => {}
+        }
+        TokenSinkResult::Continue
+    }
 }
 
 pub fn parse_html(content: Vec<u8>, _url: &String) -> Result<ParsedData, ParseHTMLError> {
-    let mut parsed_data = ParsedData {
-        title: "".to_string(),
-        description: "".to_string(),
-        words: vec![],
-        urls: vec![]
-    };
+    let sink: RefCell<TokenSinkState> = RefCell::new(TokenSinkState {
+        parent: vec!["".to_string()],
+        words: [].into(),
+        parsed_data: ParsedData {
+            description: String::from(""),
+            title: String::from(""),
+            words: vec![],
+            urls: vec![],
+        },
+    });
 
-    let html: &str = match str::from_utf8(&content) {
-        Ok(v) => v,
-        Err(_) => return Err(ParseHTMLError::TextDecodeFailed)
-    };
+    let mut input = BufferQueue::default();
 
-    let document = Html::parse_document(html);
+    // Convert Vec<u8> to ByteTendril and push to input
+    let tendril = ByteTendril::from_slice(&content);
+    input.push_back(tendril.try_reinterpret::<fmt::UTF8>().unwrap());
 
-    let title_selector = Selector::parse("title").unwrap();
-    let link_selector = Selector::parse("a").unwrap();
-    let body_selector = Selector::parse("body").unwrap();
+    let tok = Tokenizer::new(TokenSinkWrapper { rc: sink }, TokenizerOpts::default());
+    let _ = tok.feed(&mut input);
+    tok.end();
 
-    let mut wordmap: HashMap<(String, String), i32> = [].into();
+    let sink_state = tok.sink.rc.into_inner(); // Use into_inner() to take ownership
+    let mut parsed_data = sink_state.parsed_data;
 
-    for element in document.select(&body_selector) {
-        for child in element.descendent_elements() {
-            let parent_node = child.value().name();
-
-            // idea is to get the text inside an element, not the html, and store the text alongside its parent element
-            let child_text = remove_child_html(&child.inner_html());
-            
-            if child_text.len() == 0 { continue };
-            let cleaned = clean_text(&child_text);
-            let parts = cleaned.split(" ");
-            
-            for word in parts {
-                if word.len() == 0 { continue; }
-
-                let alphanumeric_word = clean_alphanumeric(word);
-                let alphanumeric_parent = clean_alphanumeric(parent_node);
-
-                match wordmap.insert((alphanumeric_parent.clone(), alphanumeric_word.clone()), 1) {
-                    Some(n) => {wordmap.insert((alphanumeric_parent, alphanumeric_word), n+1);},
-                    None => {}
-                }
-            }
-        }
-    }
-
-    for element in document.select(&body_selector) {
-        let text = element.text().collect::<Vec<_>>().join(" ");
-        if !text.is_empty() {
-            parsed_data.description = text.chars().take(512).collect::<String>();
-            parsed_data.description = parsed_data.description.replace("\n", " ");
-            break;
-        }
-    }
-
-    for element in document.select(&title_selector) {
-        for text in element.text() {
-            parsed_data.title = text.to_string();
-            if text.len() == 0 { continue };
-            let cleaned = clean_text(&text);
-            let parts = cleaned.split(" ");
-
-            for word in parts {
-                if word.len() == 0 {
-                    continue;
-                }
-
-                let alphanumeric = clean_alphanumeric(word);
-
-                match wordmap.insert(("title".to_string(), alphanumeric.clone()), 1) {
-                    Some(n) => {wordmap.insert(("title".to_string(), alphanumeric), n+1);},
-                    None => {}
-                }
-            }
-        }
-    }
-
-    for element in document.select(&link_selector) {
-        let link = match element.attr("href") {
-            Some(url) => url,
-            None => ""
+    for ((word, parent), count) in sink_state.words {
+        let o = Word{
+            word: word,
+            parent: parent,
+            count: count
         };
-        if link == "" { continue; }
-
-        parsed_data.urls.push(String::from(link))
+        parsed_data.words.push(o);
     }
 
-    for ((parent, word), count) in wordmap.iter() {
-        parsed_data.words.push(
-            Word{
-                word: word.clone(),
-                parent: parent.clone(),
-                count: *count
-            }
-        );
-    }
+    parsed_data.description = clean_description(&parsed_data.description);
 
-    return Ok(parsed_data)
+    return Ok(parsed_data);
 }
 
-fn remove_child_html(html: &String) -> String {
-    // Remove all tags and content
-    let remove_tags_re = Regex::new(r"<[^>]*>[\s\S]*?</[^>]*>").unwrap();
-    let cleaned = remove_tags_re.replace_all(html, "");
-    let trimmed = cleaned.trim();
-
-    // Remove any remaining tags (<br>, <img>, etc..)
-    if trimmed.chars().nth(0) == Some('<') && trimmed.chars().last() == Some('>') {
-        return String::from("");
-    }
-    
-    let remove_tags_re = Regex::new(r"<[^>]+>").unwrap();
-    let cleaned = remove_tags_re.replace_all(html, "");
-    let trimmed = cleaned.trim();
-
-    return trimmed.to_owned();
-}
-
-fn clean_text(text: &str) -> String {
-    let remove_non_alphanumeric = Regex::new(r"[^a-zA-Z\d\s:]|[\r\n]").unwrap();
-    let cleaned = remove_non_alphanumeric.replace_all(&text, " ").to_lowercase();
+fn clean_description(text: &str) -> String {
+    let remove_non_alphanumeric = Regex::new(r"(^ )|[^a-zA-Z\d ]|[\r\n]").unwrap();
+    let cleaned = remove_non_alphanumeric.replace_all(&text, "").to_string();
     return cleaned;
+}
+
+pub fn safe_truncate(string: &String, count: usize) -> String {
+    return string.chars().take(count).collect();
 }
 
 fn clean_alphanumeric(text: &str) -> String {
     let remove_non_alphanumeric = Regex::new(r"[^a-zA-Z\d]").unwrap();
-    let cleaned = remove_non_alphanumeric.replace_all(&text, " ").to_lowercase();
+    let cleaned = remove_non_alphanumeric
+        .replace_all(&text, "")
+        .to_lowercase();
     return cleaned;
 }
