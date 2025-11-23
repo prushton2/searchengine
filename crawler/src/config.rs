@@ -7,7 +7,7 @@ pub struct Config {
     pub database: PostgresDBInfo
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct PostgresDBInfo {
     pub host: String,
     pub username: String,

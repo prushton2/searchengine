@@ -27,7 +27,7 @@ fn main() {
 }
 
 fn index(db: &mut dyn database::Database, dict: &dyn dictionary::Dictionary) {
-    info!("Starting index");
+    info!("Index Starting");
     for _ in 0..db.crawled_page_len() {
 
         let crawled = db.get_crawled_page().unwrap();

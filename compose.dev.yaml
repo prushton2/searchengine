@@ -19,7 +19,7 @@ services:
       timeout: 60s
       retries: 5
       start_period: 10s
-  
+
   caddy:
     image: caddy
     container_name: searchengine-caddy
@@ -27,10 +27,10 @@ services:
     volumes:
       - ./config/Caddyfile:/etc/caddy/Caddyfile
     network_mode: host
-    
+
   adminer:
     image: adminer
-    restart: always
     container_name: searchengine-adminer
+    restart: always
     ports:
       - 8081:8080

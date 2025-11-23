@@ -1,4 +1,3 @@
-use std::sync::{Mutex, Arc};
 use std::thread;
 use url::Url;
 use log::{warn, trace, debug, info, error, LevelFilter};
@@ -12,19 +11,19 @@ mod database;
 mod config;
 
 fn main() {
-    let config = config::Config::read_from_file("../config/config.yaml");
+    let conf = config::Config::read_from_file("../config/config.yaml");
 
     Builder::new()
         // Set project's max level
-        .filter(Some("crawler"), config::parse_log_level(&config.crawler.log))
+        .filter(Some("crawler"), config::parse_log_level(&conf.crawler.log))
         // turn off everything else
         .filter(None, LevelFilter::Off)
         .init();
 
-    info!("Initializing {} crawler threads with a max depth of {}, and a seed url of {}", config.crawler.crawler_threads, config.crawler.max_crawl_depth, config.crawler.seed_url);
+    info!("Initializing {} crawler threads with a max depth of {}, and a seed url of {}", conf.crawler.crawler_threads, conf.crawler.max_crawl_depth, conf.crawler.seed_url);
     
-    let httprequest: http_request::HTTPRequest = http_request::HTTPRequest::new(&config.crawler.user_agent);
-    let mut database: Box<dyn database::Database + Send> = Box::new(database::PostgresDatabase::new(&config.database));
+    let httprequest: http_request::HTTPRequest = http_request::HTTPRequest::new(&conf.crawler.user_agent);
+    let database: &mut dyn database::Database = &mut database::PostgresDatabase::new(&conf.database);
     
     match database.set_schema() {
         Ok(()) => {info!("Initialized DB Schema");}
@@ -32,20 +31,18 @@ fn main() {
     };
 
     if database.urlqueue_count() == 0 {
-        let _ = database.urlqueue_push(&config.crawler.seed_url, 0, 0);
+        let _ = database.urlqueue_push(&conf.crawler.seed_url, 0, 0);
         info!("pushed seed url to queue");
     }
-
-    let arc_mutex_db = Arc::new(Mutex::new(database));
 
     let mut threads = vec![];
 
     // I start at 1 because a url with a crawler id 0 in the database means it unassigned to a crawler
-    for i in 1..config.crawler.crawler_threads+1 {
-        let arc_db = Arc::clone(&arc_mutex_db);
+    for i in 1..conf.crawler.crawler_threads+1 {
         let http_clone = httprequest.clone();
+        let db_conf = conf.database.clone();
         threads.push(thread::spawn(move || {
-            crawler_thread(arc_db, http_clone, i, config.crawler.max_crawl_depth);
+            crawler_thread(db_conf, http_clone, i, conf.crawler.max_crawl_depth);
         }))
     }
 
@@ -55,10 +52,11 @@ fn main() {
 }
 
 // a crawler thread handles one domain at a time. once done, it grabs a new domain unassigned to a crawler from the queue
-fn crawler_thread(arc_mutex_db: Arc<Mutex<Box<dyn database::Database + Send>>>, httprequest: http_request::HTTPRequest, crawler_id: i32, max_crawl_depth: i32) {
+fn crawler_thread(db_conf: config::PostgresDBInfo, httprequest: http_request::HTTPRequest, crawler_id: i32, max_crawl_depth: i32) {
     
     let robotstxt: &mut dyn robots_txt::RobotsTXT = &mut robots_txt::RobotsTXTCrate::new(httprequest.clone());
     let requesthandler: &mut dyn request_handler::RequestHandler = &mut request_handler::SimpleRequestHandler::new(robotstxt, &httprequest);
+    let database: &mut dyn database::Database = &mut database::PostgresDatabase::new(&db_conf);
 
     // if we get 5 loops with no urls, exit
     let mut no_urls_count = 0;
@@ -66,7 +64,6 @@ fn crawler_thread(arc_mutex_db: Arc<Mutex<Box<dyn database::Database + Send>>>, 
     while no_urls_count < 5 {
 
         let (url, depth) = {
-            let mut database = arc_mutex_db.lock().unwrap();
 
             match database.urlqueue_pop_front(crawler_id) {
                 Some(t) => {
@@ -78,7 +75,6 @@ fn crawler_thread(arc_mutex_db: Arc<Mutex<Box<dyn database::Database + Send>>>, 
                         no_urls_count += 1;
                         warn!("{}  | No URLs in queue ({}/5)", crawler_id, no_urls_count);
                     }
-                    drop(database);
                     std::thread::sleep(std::time::Duration::from_secs(5));
                     continue;
                 }
@@ -107,7 +103,6 @@ fn crawler_thread(arc_mutex_db: Arc<Mutex<Box<dyn database::Database + Send>>>, 
 
         // in normal circumstances this wouldnt run, but just incase
         // there is an edge case where a url may not lose its qstring and fragment, causing it to be re queried
-        let mut database = arc_mutex_db.lock().unwrap();
         match database.crawledurls_add(&dereferenced_url) {
             database::UsedUrlStatus::NewUrl => {},
             database::UsedUrlStatus::URLExists => {
@@ -132,6 +127,8 @@ fn crawler_thread(arc_mutex_db: Arc<Mutex<Box<dyn database::Database + Send>>>, 
                 continue;
             }
         };
+
+        trace!("{}  | Finished post fetch", crawler_id);
 
         for raw_crawled_url in &parsed_content.urls {
             // Tries to parse a url. if it gets something like "/domains", it fails and then tries to join the path to the parent url,
@@ -181,15 +178,21 @@ fn crawler_thread(arc_mutex_db: Arc<Mutex<Box<dyn database::Database + Send>>>, 
             }
         }
 
+        trace!("{}  | Finished URL parsing", crawler_id);
+
         match database.write_crawled_page(&parsed_content, &dereferenced_url) {
             Ok(_) => {},
-            Err(t) => { 
-                warn!("Couldnt write page to db {:?}", t);
+            Err(database::Error::SQLError(Some(t))) => {
+                warn!("{}  | Couldnt write {} to db {:?}", crawler_id, dereferenced_url, t);
                 continue; 
+            },
+            Err(t) => {
+                warn!("{}  | Couldnt write {} to db {:?}", crawler_id, dereferenced_url, t);
+                continue;
             }
         }
 
-        drop(database);
+        trace!("{}  | Finished crawling page", crawler_id);
 
         std::thread::sleep(std::time::Duration::from_secs(5));
     }
