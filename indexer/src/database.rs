@@ -116,6 +116,14 @@ impl Database for PostgresDatabase {
         }
 
         match self.client.execute(
+            "DELETE FROM indexedwords WHERE url = $1",
+            &[&url]
+        ) {
+            Ok(_) => {},
+            Err(_) => {}
+        };
+
+        match self.client.execute(
             "INSERT INTO indexedwords (url, word, weight)
             SELECT * FROM UNNEST($1::text[], $2::text[], $3::int[])
             ON CONFLICT (url, word)
