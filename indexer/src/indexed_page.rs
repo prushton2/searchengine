@@ -25,7 +25,7 @@ impl IndexedPage for BasicIndexedPage {
         self.description = page.description;
 
         for word in page.words {
-            if dict.get_word_status(&word.word) == dictionary::WordStatus::Filler {
+            if dict.get_word_status(&word.word) == dictionary::WordType::StopWord {
                 continue
             }
 
