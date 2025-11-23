@@ -117,7 +117,10 @@ impl Database for PostgresDatabase {
 
         match self.client.execute(
             "INSERT INTO indexedwords (url, word, weight)
-            SELECT * FROM UNNEST($1::text[], $2::text[], $3::int[]);",
+            SELECT * FROM UNNEST($1::text[], $2::text[], $3::int[])
+            ON CONFLICT (url, word)
+            DO UPDATE SET
+                weight = indexedwords.weight + EXCLUDED.weight;",
             &[&urls, &words, &weights]
         ) {
             Ok(_) => return Ok(()),
