@@ -141,7 +141,11 @@ pub fn parse_html(content: Vec<u8>, _url: &String) -> Result<ParsedData, ParseHT
 
     // Convert Vec<u8> to ByteTendril and push to input
     let tendril = ByteTendril::from_slice(&content);
-    input.push_back(tendril.try_reinterpret::<fmt::UTF8>().unwrap());
+    let try_reinterpret = match tendril.try_reinterpret::<fmt::UTF8>() {
+        Ok(t) => t,
+        Err(_) => return Err(ParseHTMLError::TextDecodeFailed),
+    };
+    input.push_back(try_reinterpret);
 
     let tok = Tokenizer::new(TokenSinkWrapper { rc: sink }, TokenizerOpts::default());
     let _ = tok.feed(&mut input);
@@ -165,7 +169,7 @@ pub fn parse_html(content: Vec<u8>, _url: &String) -> Result<ParsedData, ParseHT
 }
 
 fn clean_description(text: &str) -> String {
-    let remove_non_alphanumeric = Regex::new(r"(^ )|[^a-zA-Z\d ]|[\r\n]").unwrap();
+    let remove_non_alphanumeric = Regex::new(r"(^ )|[^a-zA-Z\d ]|[\r\n]").expect("clean_description regex did not compile");
     let cleaned = remove_non_alphanumeric.replace_all(&text, "").to_string();
     return cleaned;
 }
@@ -175,7 +179,7 @@ pub fn safe_truncate(string: &String, count: usize) -> String {
 }
 
 fn clean_alphanumeric(text: &str) -> String {
-    let remove_non_alphanumeric = Regex::new(r"[^a-zA-Z\d]").unwrap();
+    let remove_non_alphanumeric = Regex::new(r"[^a-zA-Z\d]").expect("clean_alphanumeric regex did not compile");
     let cleaned = remove_non_alphanumeric
         .replace_all(&text, "")
         .to_lowercase();
