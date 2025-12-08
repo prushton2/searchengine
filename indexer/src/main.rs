@@ -28,10 +28,13 @@ fn main() {
 
 fn index(db: &mut dyn database::Database, dict: &dyn dictionary::Dictionary) {
     info!("Index Starting");
+    debug!("{} page(s) to crawl", db.crawled_page_len());
     for _ in 0..db.crawled_page_len() {
-        debug!("{} page(s) to crawl", db.crawled_page_len());
 
-        let crawled = db.get_crawled_page().unwrap();
+        let crawled = match db.get_crawled_page() {
+            Some(t) => t,
+            None => continue
+        };
         debug!("Indexing {}", crawled.url);
 
         let indexed: &mut dyn indexed_page::IndexedPage = &mut indexed_page::BasicIndexedPage::new();

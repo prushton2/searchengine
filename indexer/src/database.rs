@@ -1,3 +1,5 @@
+use std::panic::AssertUnwindSafe;
+
 use postgres::{Client, NoTls, error::SqlState};
 use crate::config::PostgresDBInfo;
 use crate::crawled_page;
@@ -61,14 +63,27 @@ impl Database for PostgresDatabase {
             words: [].into()
         };
 
+        let mut has_panicked = false;
+
         for row in response {
-            crawled_data.words.push(
-                crawled_page::Word{
+            let panic = std::panic::catch_unwind(AssertUnwindSafe(|| {
+                return crawled_page::Word{
                     word:   row.get::<&str, String>("word"),
                     parent: row.get::<&str, String>("parent"),
                     count:  row.get::<&str, i32>("count")
                 }
-            );
+            }));
+
+            match panic {
+                Ok(t) => {
+                    crawled_data.words.push(t)
+                }
+                Err(_) => {
+                    has_panicked = true;
+                    break;
+                }
+            }
+
         }
 
         match self.client.execute(
@@ -85,6 +100,12 @@ impl Database for PostgresDatabase {
         ) {
             Ok(_) => {}
             Err(t) => println!("error: {:?}", t)
+        }
+
+        if has_panicked {
+            // On occasion postgres will panic when trying to fetch some data. I have no idea why this happens, and i didnt log the data causing the crash. 
+            // I will not index sites that cause postgres to panic, because that just seems like a rabbit hole i dont want to go down
+            return None
         }
 
         return Some(crawled_data);

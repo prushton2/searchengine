@@ -24,6 +24,13 @@ impl IndexedPage for BasicIndexedPage {
         self.title = page.title;
         self.description = page.description;
 
+        let mut domain_url = self.url.split('.').collect::<Vec<&str>>();
+        let _ = domain_url.pop();
+
+        for domain in domain_url {
+            self.words.insert_or_sum(domain.to_owned(), 50);
+        }
+
         for word in page.words {
             if dict.get_word_status(&word.word) == dictionary::WordType::StopWord {
                 continue
